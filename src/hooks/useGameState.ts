@@ -18,6 +18,7 @@ export interface ChainEntry {
   playedBy: 0 | 1 | 'start';
   score: number;
   connectionType: ConnectionType | '';
+  speedMultiplier: number;
 }
 
 const TURN_SECONDS = 30;
@@ -116,7 +117,7 @@ export function useGameState() {
   const newChainSegment = useCallback(() => {
     const dict = dictionaryRef.current;
     const startWord = pickStartingWord(dict);
-    const entry: ChainEntry = { word: startWord, playedBy: 'start', score: 0, connectionType: '' };
+    const entry: ChainEntry = { word: startWord, playedBy: 'start', score: 0, connectionType: '', speedMultiplier: 1 };
     setChain([entry]);
     chainRef.current = [entry];
     setCurrentPlayer(0);
@@ -155,7 +156,7 @@ export function useGameState() {
   const startGame = useCallback((selectedMode: GameMode, selectedVsSubmode?: VsSubmode, selectedComputerLevel?: ComputerLevel) => {
     const dict = dictionaryRef.current;
     const startWord = pickStartingWord(dict);
-    const initialChain: ChainEntry[] = [{ word: startWord, playedBy: 'start', score: 0, connectionType: '' }];
+    const initialChain: ChainEntry[] = [{ word: startWord, playedBy: 'start', score: 0, connectionType: '', speedMultiplier: 1 }];
     const initialLives: [number, number] = [STARTING_LIVES, STARTING_LIVES];
 
     setMode(selectedMode);
@@ -228,10 +229,12 @@ export function useGameState() {
       return;
     }
 
-    const result = evaluateMove(afterWord, move, afterUsed);
+    // Computer always "answers" within the grace period — give it a mid-range time
+    const computerTimeRemaining = TURN_SECONDS - 2;
+    const result = evaluateMove(afterWord, move, afterUsed, computerTimeRemaining, TURN_SECONDS);
     const entry: ChainEntry = {
       word: move, playedBy: 1,
-      score: result.totalScore, connectionType: result.connectionType,
+      score: result.totalScore, connectionType: result.connectionType, speedMultiplier: result.speedMultiplier,
     };
     const newChain = [...afterChain, entry];
     const newScores: [number, number] = [afterScores[0], afterScores[1] + result.totalScore];
@@ -264,7 +267,7 @@ export function useGameState() {
     const prevChain = chainRef.current;
     const prevWord = prevChain[prevChain.length - 1].word;
     const used = usedSet(prevChain);
-    const result = evaluateMove(prevWord, entry, used);
+    const result = evaluateMove(prevWord, entry, used, timeRemaining, TURN_SECONDS);
 
     setLastMoveResult(result);
     if (!result.valid) {
@@ -275,7 +278,7 @@ export function useGameState() {
     stopTimer();
 
     const player = currentPlayerRef.current;
-    const newEntry: ChainEntry = { word: entry, playedBy: player, score: result.totalScore, connectionType: result.connectionType };
+    const newEntry: ChainEntry = { word: entry, playedBy: player, score: result.totalScore, connectionType: result.connectionType, speedMultiplier: result.speedMultiplier };
     const newChain = [...prevChain, newEntry];
     const newUsed = new Set([...used, simplified]);
     const newScores: [number, number] = [...scoresRef.current] as [number, number];

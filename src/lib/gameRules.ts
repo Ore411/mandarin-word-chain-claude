@@ -29,7 +29,14 @@ export interface MoveResult {
   baseScore: number;
   lengthBonus: number;
   chengyuBonus: number;
+  speedMultiplier: number;
   totalScore: number;
+}
+
+export function calcSpeedMultiplier(timeRemaining: number, turnSeconds: number): number {
+  const gracePeriod = 5;
+  if (timeRemaining >= turnSeconds - gracePeriod) return 2.0;
+  return Math.round((0.1 + (timeRemaining / (turnSeconds - gracePeriod)) * 1.9) * 10) / 10;
 }
 
 const BASE_SCORES: Record<ConnectionType, number> = {
@@ -77,20 +84,22 @@ function classifyConnection(prev: WordEntry, next: WordEntry): ConnectionType {
 export function evaluateMove(
   prev: WordEntry,
   next: WordEntry,
-  usedWords: Set<string>
+  usedWords: Set<string>,
+  timeRemaining = 30,
+  turnSeconds = 30,
 ): MoveResult {
-  if (usedWords.has(next.simplified)) {
-    return { valid: false, connectionType: 'invalid', baseScore: 0, lengthBonus: 0, chengyuBonus: 0, totalScore: 0 };
-  }
+  const invalid = (connectionType: ConnectionType = 'invalid'): MoveResult =>
+    ({ valid: false, connectionType, baseScore: 0, lengthBonus: 0, chengyuBonus: 0, speedMultiplier: 1, totalScore: 0 });
+
+  if (usedWords.has(next.simplified)) return invalid();
 
   const connectionType = classifyConnection(prev, next);
-  if (connectionType === 'invalid') {
-    return { valid: false, connectionType, baseScore: 0, lengthBonus: 0, chengyuBonus: 0, totalScore: 0 };
-  }
+  if (connectionType === 'invalid') return invalid();
 
   const base = BASE_SCORES[connectionType];
   const lb = lengthBonus(next.wordLength);
   const cb = next.isChengyu ? 5 : 0;
+  const mult = calcSpeedMultiplier(timeRemaining, turnSeconds);
 
   return {
     valid: true,
@@ -98,7 +107,8 @@ export function evaluateMove(
     baseScore: base,
     lengthBonus: lb,
     chengyuBonus: cb,
-    totalScore: base + lb + cb,
+    speedMultiplier: mult,
+    totalScore: Math.round((base + lb + cb) * mult),
   };
 }
 

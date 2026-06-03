@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, KeyboardEvent } from 'react';
 import type { ChainEntry, GameMode, GameOverReason, VsSubmode, ComputerLevel } from '@/hooks/useGameState';
 import type { MoveResult, ConnectionType } from '@/lib/gameRules';
+import { calcSpeedMultiplier } from '@/lib/gameRules';
 import { getInitialFamilyDisplay, getCompatibleFinals } from '@/lib/pinyin';
 
 const CONNECTION_LABELS: Record<ConnectionType, string> = {
@@ -51,7 +52,16 @@ function ChainEntryRow({ entry, mode, isLast }: { entry: ChainEntry; mode: GameM
     <div className={`flex items-start gap-3 py-3 ${isLast ? 'opacity-100' : 'opacity-60'}`}>
       <div className="flex flex-col items-end min-w-[2.5rem]">
         <PlayerLabel playedBy={entry.playedBy} mode={mode} />
-        {entry.score > 0 && <span className="text-slate-400 text-xs">+{entry.score}</span>}
+        {entry.score > 0 && (
+          <span className="text-slate-400 text-xs">
+            +{entry.score}
+            {entry.speedMultiplier !== 1 && entry.speedMultiplier !== undefined && (
+              <span className={`ml-0.5 ${entry.speedMultiplier >= 1.8 ? 'text-emerald-400' : entry.speedMultiplier >= 1.0 ? 'text-amber-400' : 'text-red-400'}`}>
+                {entry.speedMultiplier.toFixed(1)}×
+              </span>
+            )}
+          </span>
+        )}
       </div>
       <div className="flex flex-col">
         <span className="text-2xl font-bold text-white tracking-wider">{entry.word.simplified}</span>
@@ -65,6 +75,17 @@ function ChainEntryRow({ entry, mode, isLast }: { entry: ChainEntry; mode: GameM
         )}
       </div>
     </div>
+  );
+}
+
+function SpeedBadge({ timeRemaining }: { timeRemaining: number }) {
+  const mult = calcSpeedMultiplier(timeRemaining, 30);
+  const color = mult >= 1.8 ? 'text-emerald-300 bg-emerald-900/60' :
+                mult >= 1.0 ? 'text-amber-300 bg-amber-900/60' : 'text-red-400 bg-red-900/40';
+  return (
+    <span className={`text-xs font-bold px-2 py-0.5 rounded font-mono ${color}`}>
+      {mult.toFixed(1)}×
+    </span>
   );
 }
 
@@ -321,6 +342,7 @@ export default function GameBoard({
           <span className={`text-sm font-mono w-6 text-right ${timeRemaining <= 8 ? 'text-red-400' : 'text-slate-400'}`}>
             {timeRemaining}
           </span>
+          <SpeedBadge timeRemaining={timeRemaining} />
         </div>
       </div>
 
