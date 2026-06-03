@@ -350,24 +350,22 @@ export default function MultiplayerBoard({
         return (
           <div className="flex-none bg-slate-800 border-t-2 border-emerald-700">
             {/* Word display */}
-            <div className="px-4 pt-4 pb-3 flex items-start gap-4">
-              <div className="flex flex-col items-center">
-                <span className="text-6xl font-bold text-emerald-300 tracking-wider leading-none drop-shadow-[0_0_12px_rgba(110,231,183,0.4)]">
+            <div className="px-4 pt-4 pb-3">
+              {/* Chinese + English equally prominent */}
+              <div className="flex items-center gap-4 mb-2">
+                <span className="text-5xl font-bold text-emerald-300 tracking-wider leading-none drop-shadow-[0_0_12px_rgba(110,231,183,0.4)] shrink-0">
                   {currentWord.word.simplified}
                 </span>
-                <span className="text-slate-400 text-sm font-mono mt-1">
-                  {currentWord.word.pinyin}
-                </span>
-              </div>
-              <div className="flex-1 flex flex-col justify-center pt-1">
-                <span className="text-white text-base leading-snug font-medium">
+                <span className="text-slate-400 text-xs font-mono leading-tight shrink-0">{currentWord.word.pinyin}</span>
+                <span className="text-white text-lg leading-snug font-semibold">
                   {currentWord.word.english}
                 </span>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-slate-500 text-xs">Chain from last character:</span>
-                  <span className="text-2xl font-bold text-emerald-400">{currentWord.word.lastChar}</span>
-                  <span className="text-slate-400 text-sm font-mono">{initial || '∅'}{final}</span>
-                </div>
+              </div>
+              {/* Chain target */}
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500 text-xs">Chain from:</span>
+                <span className="text-2xl font-bold text-emerald-400">{currentWord.word.lastChar}</span>
+                <span className="text-slate-400 text-sm font-mono">{initial || '∅'}{final}</span>
               </div>
             </div>
             {/* Hints row */}
