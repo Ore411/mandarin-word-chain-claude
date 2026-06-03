@@ -226,7 +226,7 @@ export default function MultiplayerBoard({
               <div className="w-full">
                 <p className="text-xs text-slate-400 uppercase tracking-wider mb-2 text-center">Target score</p>
                 <div className="flex gap-2">
-                  {[50, 100, 200].map(t => (
+                  {[100, 200, 500].map(t => (
                     <button
                       key={t}
                       onClick={() => setSelectedTarget(t)}

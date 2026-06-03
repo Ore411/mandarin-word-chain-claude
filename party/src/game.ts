@@ -324,7 +324,7 @@ export default class GameRoom implements Party.Server {
       return;
     }
     const validSeconds = [30, 60].includes(turnSeconds) ? turnSeconds : TURN_SECONDS;
-    const validTarget = targetScore && [50, 100, 200].includes(targetScore) ? targetScore : null;
+    const validTarget = targetScore && [100, 200, 500].includes(targetScore) ? targetScore : null;
     await this.startGame(validSeconds, validTarget);
   }
 
