@@ -127,7 +127,9 @@ function lengthBonus(n: number): number {
 }
 
 function speedMultiplier(timeRemaining: number, turnSeconds: number): number {
-  return Math.round((1 + timeRemaining / turnSeconds) * 10) / 10;
+  const gracePeriod = 5;
+  if (timeRemaining >= turnSeconds - gracePeriod) return 2.0;
+  return Math.round((1 + timeRemaining / (turnSeconds - gracePeriod)) * 10) / 10;
 }
 
 function hasValidMoves(prev: WordEntry, dict: WordEntry[], usedWords: Set<string>): boolean {
