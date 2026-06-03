@@ -38,6 +38,8 @@ export interface PlayerInfo {
   name: string;
   score: number;
   connected: boolean;
+  timeouts: number;
+  eliminated: boolean;
 }
 
 export type RoomStatus = 'waiting' | 'playing' | 'game-over';

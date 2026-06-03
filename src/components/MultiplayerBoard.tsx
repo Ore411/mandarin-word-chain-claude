@@ -33,6 +33,18 @@ const CONNECTION_COLORS: Record<string, string> = {
   familyInitialStrongFinal: 'text-violet-300', weakMusicalFinal: 'text-amber-400',
 };
 
+const MAX_TIMEOUTS = 3;
+
+function Strikes({ count }: { count: number }) {
+  return (
+    <div className="flex gap-0.5">
+      {Array.from({ length: MAX_TIMEOUTS }).map((_, i) => (
+        <span key={i} className={`text-xs ${i < count ? 'text-red-400' : 'text-slate-700'}`}>✕</span>
+      ))}
+    </div>
+  );
+}
+
 function TimerBar({ timeRemaining, turnSeconds }: { timeRemaining: number; turnSeconds: number }) {
   const pct = (timeRemaining / turnSeconds) * 100;
   const half = turnSeconds / 2;
@@ -220,9 +232,13 @@ export default function MultiplayerBoard({
           {sorted.map((p, rank) => (
             <div key={p.id} className={`flex items-center gap-3 px-4 py-3 rounded-xl ${playerBg(p.index)}`}>
               <span className="text-slate-400 text-sm w-5 text-right">{rank + 1}</span>
-              <span className={`flex-1 font-medium text-left ${playerColor(p.index)}`}>
-                {p.name}{p.index === myIndex ? ' (you)' : ''}
-              </span>
+              <div className="flex-1 text-left">
+                <span className={`font-medium ${playerColor(p.index)}`}>
+                  {p.name}{p.index === myIndex ? ' (you)' : ''}
+                </span>
+                {p.eliminated && <span className="text-xs text-red-400 ml-2">eliminated</span>}
+                <div><Strikes count={p.timeouts} /></div>
+              </div>
               <span className={`font-bold text-lg ${playerColor(p.index)}`}>{p.score}</span>
             </div>
           ))}
@@ -247,13 +263,15 @@ export default function MultiplayerBoard({
             <div
               key={p.id}
               className={`flex-none text-center px-3 py-1.5 rounded-lg transition-opacity ${
+                p.eliminated ? 'opacity-25 line-through' :
                 p.index === currentPlayerIndex ? 'opacity-100 ring-1 ring-current' : 'opacity-50'
               } ${playerColor(p.index)}`}
             >
               <div className="text-base font-bold leading-none">{p.score}</div>
               <div className="text-xs opacity-80 mt-0.5 max-w-[4rem] truncate">{p.name}</div>
-              {p.index === myIndex && <div className="text-xs opacity-60">you</div>}
-              {!p.connected && <div className="text-xs text-slate-500">···</div>}
+              {p.index === myIndex && !p.eliminated && <div className="text-xs opacity-60">you</div>}
+              {!p.connected && !p.eliminated && <div className="text-xs text-slate-500">···</div>}
+              <div className="flex justify-center mt-0.5"><Strikes count={p.timeouts} /></div>
             </div>
           ))}
         </div>
@@ -261,7 +279,11 @@ export default function MultiplayerBoard({
         {/* Turn + multiplier */}
         <div className="flex items-center justify-between mb-2">
           <div className="text-slate-300 text-sm font-medium">
-            {isMyTurn ? 'Your turn' : `${currentTurnPlayer?.name ?? '…'}'s turn`}
+            {isMyTurn
+              ? 'Your turn'
+              : currentTurnPlayer?.eliminated
+                ? `${currentTurnPlayer.name} eliminated…`
+                : `${currentTurnPlayer?.name ?? '…'}'s turn`}
           </div>
           <div className="flex items-center gap-2">
             <span className="text-slate-500 text-xs">Speed bonus</span>

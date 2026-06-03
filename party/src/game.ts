@@ -39,6 +39,8 @@ export interface PlayerInfo {
   name: string;
   score: number;
   connected: boolean;
+  timeouts: number;    // 0–3
+  eliminated: boolean; // true when timeouts >= MAX_TIMEOUTS
 }
 
 export interface RoomState {
@@ -128,6 +130,10 @@ function speedMultiplier(timeRemaining: number, turnSeconds: number): number {
   return Math.round((1 + timeRemaining / turnSeconds) * 10) / 10;
 }
 
+function hasValidMoves(prev: WordEntry, dict: WordEntry[], usedWords: Set<string>): boolean {
+  return dict.some(e => !usedWords.has(e.simplified) && classifyConnection(prev, e) !== 'invalid');
+}
+
 // ── Pinyin parser ────────────────────────────────────────────────────────────
 
 const INITIALS = ['zh', 'ch', 'sh', 'b', 'p', 'm', 'f', 'd', 't', 'n', 'l',
@@ -183,6 +189,8 @@ function pickStartingWord(dict: WordEntry[]): WordEntry {
 
 const TURN_SECONDS = 30;
 const MAX_PLAYERS = 10;
+const MAX_TIMEOUTS = 3;
+const TIMEOUT_PENALTY = 5;
 
 // ── Party Server ──────────────────────────────────────────────────────────────
 
@@ -278,7 +286,7 @@ export default class GameRoom implements Party.Server {
 
     const index = this.state.players.length;
     const trimmedName = name.trim() || `Player ${index + 1}`;
-    this.state.players.push({ id: conn.id, clientId, index, name: trimmedName, score: 0, connected: true });
+    this.state.players.push({ id: conn.id, clientId, index, name: trimmedName, score: 0, connected: true, timeouts: 0, eliminated: false });
 
     if (!this.state.hostId) this.state.hostId = conn.id;
 
@@ -347,9 +355,16 @@ export default class GameRoom implements Party.Server {
     this.usedWords.add(simplified);
     this.state.players[player.index].score += score;
 
-    // Advance to next player (round-robin)
-    this.state.currentPlayerIndex = (player.index + 1) % this.state.players.length;
+    // Check if the chain is now stuck (no valid moves from this new word)
+    if (!hasValidMoves(entry, this.dict, this.usedWords)) {
+      this.state.status = 'game-over';
+      this.state.gameOverReason = 'No valid moves left — chain complete!';
+      this.broadcast();
+      await this.saveState();
+      return;
+    }
 
+    this.advanceToNextPlayer();
     this.broadcast();
     await this.saveState();
     this.startTimer();
@@ -371,7 +386,7 @@ export default class GameRoom implements Party.Server {
     this.state.timeRemaining = turnSeconds;
     this.state.gameOverReason = null;
     this.state.lastMoveError = null;
-    this.state.players.forEach(p => { p.score = 0; });
+    this.state.players.forEach(p => { p.score = 0; p.timeouts = 0; p.eliminated = false; });
 
     this.broadcast();
     await this.saveState();
@@ -386,12 +401,43 @@ export default class GameRoom implements Party.Server {
       this.broadcast();
       if (this.state.timeRemaining <= 0) {
         this.stopTimer();
-        this.state.status = 'game-over';
-        this.state.gameOverReason = 'timeout';
-        this.broadcast();
-        await this.saveState();
+        await this.handleTurnTimeout();
       }
     }, 1000);
+  }
+
+  private async handleTurnTimeout() {
+    const player = this.state.players[this.state.currentPlayerIndex];
+    player.score -= TIMEOUT_PENALTY;
+    player.timeouts += 1;
+
+    if (player.timeouts >= MAX_TIMEOUTS) {
+      player.eliminated = true;
+      const active = this.state.players.filter(p => !p.eliminated);
+      if (active.length < 2) {
+        this.state.status = 'game-over';
+        this.state.gameOverReason =
+          active.length === 1 ? `${active[0].name} is the last player standing!` : 'All players eliminated';
+        this.broadcast();
+        await this.saveState();
+        return;
+      }
+    }
+
+    this.advanceToNextPlayer();
+    this.broadcast();
+    await this.saveState();
+    this.startTimer();
+  }
+
+  private advanceToNextPlayer() {
+    const total = this.state.players.length;
+    let next = (this.state.currentPlayerIndex + 1) % total;
+    for (let i = 0; i < total; i++) {
+      if (!this.state.players[next].eliminated) break;
+      next = (next + 1) % total;
+    }
+    this.state.currentPlayerIndex = next;
   }
 
   private stopTimer() {
