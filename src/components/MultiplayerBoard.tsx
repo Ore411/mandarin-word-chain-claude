@@ -363,7 +363,7 @@ export default function MultiplayerBoard({
               </div>
               {/* Chain target */}
               <div className="flex items-center gap-2">
-                <span className="text-slate-500 text-xs">Chain from:</span>
+                <span className="text-slate-500 text-xs">Continue with:</span>
                 <span className="text-2xl font-bold text-emerald-400">{currentWord.word.lastChar}</span>
                 <span className="text-slate-400 text-sm font-mono">{initial || '∅'}{final}</span>
               </div>
