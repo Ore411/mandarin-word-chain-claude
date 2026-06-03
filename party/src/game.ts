@@ -172,7 +172,7 @@ let cachedDict: WordEntry[] | null = null;
 
 async function getDictionary(): Promise<WordEntry[]> {
   if (cachedDict) return cachedDict;
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://mandarin-word-chain-claude.vercel.app';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://chinese-word-chain.vercel.app';
   const res = await fetch(`${baseUrl}/api/dictionary`);
   if (!res.ok) throw new Error('Failed to load dictionary');
   cachedDict = await res.json() as WordEntry[];
