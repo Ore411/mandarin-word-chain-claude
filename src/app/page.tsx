@@ -313,38 +313,21 @@ function VsComputer() {
 // ── Solo Practice section ─────────────────────────────────────────────────────
 
 function SoloMode() {
-  const [expanded, setExpanded] = useState(false);
-  const [selectedTime, setSelectedTime] = useState(30);
   return (
-    <div>
-      <button
-        onClick={() => setExpanded(v => !v)}
-        className="group w-full flex items-center gap-4 p-5 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-emerald-500 rounded-2xl transition-all text-left"
-      >
-        <span className="text-3xl">🧘</span>
-        <div className="flex-1">
-          <div className="flex items-baseline gap-2">
-            <span className="font-semibold text-lg">Solo Practice</span>
-            <span className="text-slate-500 text-sm">单人练习</span>
-          </div>
-          <p className="text-slate-400 text-sm mt-0.5">Build the longest chain you can. No opponent, no pressure.</p>
+    <Link
+      href="/game?mode=solo"
+      className="group flex items-center gap-4 p-5 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-emerald-500 rounded-2xl transition-all"
+    >
+      <span className="text-3xl">🧘</span>
+      <div className="flex-1">
+        <div className="flex items-baseline gap-2">
+          <span className="font-semibold text-lg">Solo Practice</span>
+          <span className="text-slate-500 text-sm">单人练习</span>
         </div>
-        <span className={`text-slate-400 text-lg transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}>→</span>
-      </button>
-      {expanded && (
-        <div className="mt-2 ml-4">
-          <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-4 flex flex-col gap-4">
-            <TimePicker value={selectedTime} onChange={setSelectedTime} />
-            <Link
-              href={`/game?mode=solo&time=${selectedTime}`}
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-semibold text-center transition-colors"
-            >
-              Start
-            </Link>
-          </div>
-        </div>
-      )}
-    </div>
+        <p className="text-slate-400 text-sm mt-0.5">Build the longest chain you can. No opponent, no pressure.</p>
+      </div>
+      <span className="text-slate-600 group-hover:text-emerald-400 transition-colors text-xl">→</span>
+    </Link>
   );
 }
 
