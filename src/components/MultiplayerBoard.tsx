@@ -135,7 +135,7 @@ interface Props {
   serverError: string | null;
   roomId: string;
   onSubmit: (word: string) => void;
-  onStart: (turnSeconds: 30 | 60, targetScore: number | null, livesMode: number | null) => void;
+  onStart: (turnSeconds: 15 | 30 | 60, targetScore: number | null, livesMode: number | null) => void;
   onRematch: () => void;
   onLeave: () => void;
 }
@@ -144,7 +144,7 @@ export default function MultiplayerBoard({
   roomState, myIndex, isMyTurn, isHost, serverError, roomId, onSubmit, onStart, onRematch, onLeave,
 }: Props) {
   const [input, setInput] = useState('');
-  const [selectedTime, setSelectedTime] = useState<30 | 60>(30);
+  const [selectedTime, setSelectedTime] = useState<15 | 30 | 60>(30);
   const [gameMode, setGameMode] = useState<'endless' | 'first-to-x' | 'lives'>('endless');
   const [selectedTarget, setSelectedTarget] = useState<number>(100);
   const [selectedLives, setSelectedLives] = useState<number>(3);
@@ -260,13 +260,13 @@ export default function MultiplayerBoard({
             <div className="w-full">
               <p className="text-xs text-slate-400 uppercase tracking-wider mb-2 text-center">Time per turn</p>
               <div className="flex gap-2">
-                {([30, 60] as const).map(t => (
+                {([15, 30, 60] as const).map(t => (
                   <button key={t} onClick={() => setSelectedTime(t)}
                     className={`flex-1 py-2 rounded-xl font-semibold text-sm transition-colors ${
                       selectedTime === t ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
                   >
-                    {t === 30 ? '30 seconds' : '1 minute'}
+                    {t === 15 ? '15 sec' : t === 30 ? '30 sec' : '1 min'}
                   </button>
                 ))}
               </div>

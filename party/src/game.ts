@@ -326,7 +326,7 @@ export default class GameRoom implements Party.Server {
       conn.send(JSON.stringify({ type: 'error', message: 'Need at least 2 players to start' } satisfies ServerMsg));
       return;
     }
-    const validSeconds = [30, 60].includes(turnSeconds) ? turnSeconds : TURN_SECONDS;
+    const validSeconds = [15, 30, 60].includes(turnSeconds) ? turnSeconds : TURN_SECONDS;
     const validTarget = targetScore && [100, 200, 500].includes(targetScore) ? targetScore : null;
     const validLives = livesMode && [1, 2, 3].includes(livesMode) ? livesMode : null;
     // Only one mode at a time — lives takes priority if both sent

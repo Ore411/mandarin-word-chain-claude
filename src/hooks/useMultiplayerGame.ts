@@ -116,7 +116,7 @@ export function useMultiplayerGame(roomId: string, playerName: string) {
     ws?.send(JSON.stringify({ type: 'play', word }));
   }, [ws]);
 
-  const startGame = useCallback((turnSeconds: 30 | 60, targetScore: number | null, livesMode: number | null) => {
+  const startGame = useCallback((turnSeconds: 15 | 30 | 60, targetScore: number | null, livesMode: number | null) => {
     ws?.send(JSON.stringify({ type: 'start', turnSeconds, targetScore, livesMode }));
   }, [ws]);
 
