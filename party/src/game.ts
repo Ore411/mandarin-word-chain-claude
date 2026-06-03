@@ -39,8 +39,9 @@ export interface PlayerInfo {
   name: string;
   score: number;
   connected: boolean;
-  timeouts: number;    // 0–3
-  eliminated: boolean; // true when timeouts >= MAX_TIMEOUTS
+  timeouts: number;    // 0–3 (used in endless mode)
+  lives: number;       // current lives (used in lives mode)
+  eliminated: boolean;
 }
 
 export interface RoomState {
@@ -51,7 +52,8 @@ export interface RoomState {
   currentPlayerIndex: number;
   turnSeconds: number;
   timeRemaining: number;
-  targetScore: number | null;
+  targetScore: number | null;  // First-to-X mode
+  livesMode: number | null;    // Lives mode: starting lives per player (1/2/3)
   gameOverReason: string | null;
   lastMoveError: string | null;
 }
@@ -64,7 +66,7 @@ type ServerMsg =
 
 type ClientMsg =
   | { type: 'join'; name: string; clientId: string }
-  | { type: 'start'; turnSeconds: number; targetScore: number | null }
+  | { type: 'start'; turnSeconds: number; targetScore: number | null; livesMode: number | null }
   | { type: 'rematch' }
   | { type: 'play'; word: string };
 
@@ -221,6 +223,7 @@ export default class GameRoom implements Party.Server {
     turnSeconds: TURN_SECONDS,
     timeRemaining: TURN_SECONDS,
     targetScore: null,
+    livesMode: null,
     gameOverReason: null,
     lastMoveError: null,
   };
@@ -251,7 +254,7 @@ export default class GameRoom implements Party.Server {
     try { msg = JSON.parse(raw) as ClientMsg; } catch { return; }
 
     if (msg.type === 'join') await this.handleJoin(sender, msg.name, msg.clientId);
-    else if (msg.type === 'start') await this.handleStart(sender, msg.turnSeconds, msg.targetScore);
+    else if (msg.type === 'start') await this.handleStart(sender, msg.turnSeconds, msg.targetScore, msg.livesMode);
     else if (msg.type === 'rematch') await this.handleRematch(sender);
     else if (msg.type === 'play') await this.handlePlay(sender, msg.word);
   }
@@ -305,7 +308,7 @@ export default class GameRoom implements Party.Server {
 
     const index = this.state.players.length;
     const trimmedName = name.trim() || `Player ${index + 1}`;
-    this.state.players.push({ id: conn.id, clientId, index, name: trimmedName, score: 0, connected: true, timeouts: 0, eliminated: false });
+    this.state.players.push({ id: conn.id, clientId, index, name: trimmedName, score: 0, connected: true, timeouts: 0, lives: 0, eliminated: false });
 
     if (!this.state.hostId) this.state.hostId = conn.id;
 
@@ -313,7 +316,7 @@ export default class GameRoom implements Party.Server {
     await this.saveState();
   }
 
-  private async handleStart(conn: Party.Connection, turnSeconds: number, targetScore: number | null) {
+  private async handleStart(conn: Party.Connection, turnSeconds: number, targetScore: number | null, livesMode: number | null) {
     if (this.state.status !== 'waiting') return;
     if (this.state.hostId !== conn.id) {
       conn.send(JSON.stringify({ type: 'error', message: 'Only the host can start the game' } satisfies ServerMsg));
@@ -325,7 +328,9 @@ export default class GameRoom implements Party.Server {
     }
     const validSeconds = [30, 60].includes(turnSeconds) ? turnSeconds : TURN_SECONDS;
     const validTarget = targetScore && [100, 200, 500].includes(targetScore) ? targetScore : null;
-    await this.startGame(validSeconds, validTarget);
+    const validLives = livesMode && [1, 2, 3].includes(livesMode) ? livesMode : null;
+    // Only one mode at a time — lives takes priority if both sent
+    await this.startGame(validSeconds, validLives ? null : validTarget, validLives);
   }
 
   private async handleRematch(conn: Party.Connection) {
@@ -339,12 +344,14 @@ export default class GameRoom implements Party.Server {
     this.state.status = 'waiting';
     this.state.chain = [];
     this.state.targetScore = null;
+    this.state.livesMode = null;
     this.state.gameOverReason = null;
     this.state.lastMoveError = null;
     this.state.currentPlayerIndex = 0;
     this.state.players.forEach(p => {
       p.score = 0;
       p.timeouts = 0;
+      p.lives = 0;
       p.eliminated = false;
     });
     this.broadcast();
@@ -424,7 +431,7 @@ export default class GameRoom implements Party.Server {
 
   // ── Game flow ──────────────────────────────────────────────────────────────
 
-  private async startGame(turnSeconds: number = TURN_SECONDS, targetScore: number | null = null) {
+  private async startGame(turnSeconds: number = TURN_SECONDS, targetScore: number | null = null, livesMode: number | null = null) {
     const startWord = pickStartingWord(this.dict);
     this.usedWords = new Set([startWord.simplified]);
 
@@ -432,6 +439,7 @@ export default class GameRoom implements Party.Server {
     this.state.status = 'playing';
     this.state.turnSeconds = turnSeconds;
     this.state.targetScore = targetScore;
+    this.state.livesMode = livesMode;
     this.state.chain = [{
       word: startWord, playedBy: 'start', playerIndex: firstPlayer,
       score: 0, connectionType: '', speedMultiplier: 1,
@@ -440,7 +448,7 @@ export default class GameRoom implements Party.Server {
     this.state.timeRemaining = turnSeconds;
     this.state.gameOverReason = null;
     this.state.lastMoveError = null;
-    this.state.players.forEach(p => { p.score = 0; p.timeouts = 0; p.eliminated = false; });
+    this.state.players.forEach(p => { p.score = 0; p.timeouts = 0; p.lives = livesMode ?? 0; p.eliminated = false; });
 
     this.broadcast();
     await this.saveState();
@@ -463,10 +471,22 @@ export default class GameRoom implements Party.Server {
   private async handleTurnTimeout() {
     const player = this.state.players[this.state.currentPlayerIndex];
     player.score -= TIMEOUT_PENALTY;
-    player.timeouts += 1;
 
-    if (player.timeouts >= MAX_TIMEOUTS) {
-      player.eliminated = true;
+    if (this.state.livesMode !== null) {
+      // Lives mode: lose a life, eliminate at 0
+      player.lives -= 1;
+      if (player.lives <= 0) {
+        player.eliminated = true;
+      }
+    } else {
+      // Endless / First-to-X mode: timeout strikes
+      player.timeouts += 1;
+      if (player.timeouts >= MAX_TIMEOUTS) {
+        player.eliminated = true;
+      }
+    }
+
+    if (player.eliminated) {
       const active = this.state.players.filter(p => !p.eliminated);
       if (active.length < 2) {
         this.state.status = 'game-over';

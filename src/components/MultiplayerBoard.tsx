@@ -131,7 +131,7 @@ interface Props {
   serverError: string | null;
   roomId: string;
   onSubmit: (word: string) => void;
-  onStart: (turnSeconds: 30 | 60, targetScore: number | null) => void;
+  onStart: (turnSeconds: 30 | 60, targetScore: number | null, livesMode: number | null) => void;
   onRematch: () => void;
   onLeave: () => void;
 }
@@ -141,7 +141,9 @@ export default function MultiplayerBoard({
 }: Props) {
   const [input, setInput] = useState('');
   const [selectedTime, setSelectedTime] = useState<30 | 60>(30);
-  const [selectedTarget, setSelectedTarget] = useState<number | null>(null);
+  const [gameMode, setGameMode] = useState<'endless' | 'first-to-x' | 'lives'>('endless');
+  const [selectedTarget, setSelectedTarget] = useState<number>(100);
+  const [selectedLives, setSelectedLives] = useState<number>(3);
   const inputRef = useRef<HTMLInputElement>(null);
   const chainEndRef = useRef<HTMLDivElement>(null);
 
@@ -157,7 +159,7 @@ export default function MultiplayerBoard({
     if (e.key === 'Enter') handleSubmit();
   }
 
-  const { players, chain, currentPlayerIndex, turnSeconds, timeRemaining, targetScore, status, gameOverReason, lastMoveError, hostId } = roomState;
+  const { players, chain, currentPlayerIndex, turnSeconds, timeRemaining, targetScore, livesMode, status, gameOverReason, lastMoveError, hostId } = roomState;
   const currentTurnPlayer = players.find(p => p.index === currentPlayerIndex);
   const currentWord = chain[chain.length - 1];
 
@@ -202,34 +204,25 @@ export default function MultiplayerBoard({
             <div className="w-full">
               <p className="text-xs text-slate-400 uppercase tracking-wider mb-2 text-center">Game mode</p>
               <div className="flex gap-2">
-                <button
-                  onClick={() => setSelectedTarget(null)}
-                  className={`flex-1 py-2 rounded-xl font-semibold text-sm transition-colors ${
-                    selectedTarget === null ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                  }`}
-                >
-                  Endless
-                </button>
-                <button
-                  onClick={() => setSelectedTarget(t => t ?? 100)}
-                  className={`flex-1 py-2 rounded-xl font-semibold text-sm transition-colors ${
-                    selectedTarget !== null ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                  }`}
-                >
-                  First to X pts
-                </button>
+                {(['endless', 'first-to-x', 'lives'] as const).map(m => (
+                  <button key={m} onClick={() => setGameMode(m)}
+                    className={`flex-1 py-2 rounded-xl font-semibold text-xs transition-colors ${
+                      gameMode === m ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                  >
+                    {m === 'endless' ? 'Endless' : m === 'first-to-x' ? 'First to X' : '❤️ Lives'}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Target score (only when First-to-X selected) */}
-            {selectedTarget !== null && (
+            {/* Target score (First-to-X) */}
+            {gameMode === 'first-to-x' && (
               <div className="w-full">
                 <p className="text-xs text-slate-400 uppercase tracking-wider mb-2 text-center">Target score</p>
                 <div className="flex gap-2">
                   {[100, 200, 500].map(t => (
-                    <button
-                      key={t}
-                      onClick={() => setSelectedTarget(t)}
+                    <button key={t} onClick={() => setSelectedTarget(t)}
                       className={`flex-1 py-2 rounded-xl font-semibold text-sm transition-colors ${
                         selectedTarget === t ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                       }`}
@@ -241,14 +234,30 @@ export default function MultiplayerBoard({
               </div>
             )}
 
+            {/* Lives per player */}
+            {gameMode === 'lives' && (
+              <div className="w-full">
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-2 text-center">Lives per player</p>
+                <div className="flex gap-2">
+                  {[1, 2, 3].map(l => (
+                    <button key={l} onClick={() => setSelectedLives(l)}
+                      className={`flex-1 py-2 rounded-xl font-semibold text-sm transition-colors ${
+                        selectedLives === l ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      {'❤️'.repeat(l)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Time per turn */}
             <div className="w-full">
               <p className="text-xs text-slate-400 uppercase tracking-wider mb-2 text-center">Time per turn</p>
               <div className="flex gap-2">
                 {([30, 60] as const).map(t => (
-                  <button
-                    key={t}
-                    onClick={() => setSelectedTime(t)}
+                  <button key={t} onClick={() => setSelectedTime(t)}
                     className={`flex-1 py-2 rounded-xl font-semibold text-sm transition-colors ${
                       selectedTime === t ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
@@ -260,7 +269,11 @@ export default function MultiplayerBoard({
             </div>
 
             <button
-              onClick={() => onStart(selectedTime, selectedTarget)}
+              onClick={() => onStart(
+                selectedTime,
+                gameMode === 'first-to-x' ? selectedTarget : null,
+                gameMode === 'lives' ? selectedLives : null,
+              )}
               disabled={players.length < 2}
               className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-colors"
             >
@@ -310,7 +323,13 @@ export default function MultiplayerBoard({
                       {p.name}{p.index === myIndex ? ' (you)' : ''}
                     </span>
                     {p.eliminated && <span className="text-xs text-red-400 ml-2">eliminated</span>}
-                    <div><Strikes count={p.timeouts} /></div>
+                    <div>
+                      {livesMode ? (
+                        <span className="text-xs">{Array.from({ length: livesMode }).map((_, i) => i < p.lives ? '❤️' : '🖤').join('')}</span>
+                      ) : (
+                        <Strikes count={p.timeouts} />
+                      )}
+                    </div>
                   </div>
                   <span className={`font-bold text-xl ${rank === 0 ? playerColor(p.index) : 'text-slate-300'}`}>{p.score}</span>
                   {targetScore && <span className="text-slate-500 text-xs">/ {targetScore}</span>}
@@ -361,7 +380,13 @@ export default function MultiplayerBoard({
               <div className="text-xs opacity-80 mt-0.5 max-w-[4rem] truncate">{p.name}</div>
               {p.index === myIndex && !p.eliminated && <div className="text-xs opacity-60">you</div>}
               {!p.connected && !p.eliminated && <div className="text-xs text-slate-500">···</div>}
-              <div className="flex justify-center mt-0.5"><Strikes count={p.timeouts} /></div>
+              <div className="flex justify-center mt-0.5">
+                {livesMode ? (
+                  <span className="text-xs">{Array.from({ length: livesMode }).map((_, i) => i < p.lives ? '❤️' : '🖤').join('')}</span>
+                ) : (
+                  <Strikes count={p.timeouts} />
+                )}
+              </div>
             </div>
           ))}
         </div>

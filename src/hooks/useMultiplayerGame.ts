@@ -39,6 +39,7 @@ export interface PlayerInfo {
   score: number;
   connected: boolean;
   timeouts: number;
+  lives: number;
   eliminated: boolean;
 }
 
@@ -53,6 +54,7 @@ export interface RoomState {
   turnSeconds: number;
   timeRemaining: number;
   targetScore: number | null;
+  livesMode: number | null;
   gameOverReason: string | null;
   lastMoveError: string | null;
 }
@@ -114,8 +116,8 @@ export function useMultiplayerGame(roomId: string, playerName: string) {
     ws?.send(JSON.stringify({ type: 'play', word }));
   }, [ws]);
 
-  const startGame = useCallback((turnSeconds: 30 | 60, targetScore: number | null) => {
-    ws?.send(JSON.stringify({ type: 'start', turnSeconds, targetScore }));
+  const startGame = useCallback((turnSeconds: 30 | 60, targetScore: number | null, livesMode: number | null) => {
+    ws?.send(JSON.stringify({ type: 'start', turnSeconds, targetScore, livesMode }));
   }, [ws]);
 
   const rematch = useCallback(() => {
