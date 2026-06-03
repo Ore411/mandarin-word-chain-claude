@@ -378,13 +378,14 @@ export default class GameRoom implements Party.Server {
     const startWord = pickStartingWord(this.dict);
     this.usedWords = new Set([startWord.simplified]);
 
+    const firstPlayer = Math.floor(Math.random() * this.state.players.length);
     this.state.status = 'playing';
     this.state.turnSeconds = turnSeconds;
     this.state.chain = [{
-      word: startWord, playedBy: 'start', playerIndex: 0,
+      word: startWord, playedBy: 'start', playerIndex: firstPlayer,
       score: 0, connectionType: '', speedMultiplier: 1,
     }];
-    this.state.currentPlayerIndex = 0;
+    this.state.currentPlayerIndex = firstPlayer;
     this.state.timeRemaining = turnSeconds;
     this.state.gameOverReason = null;
     this.state.lastMoveError = null;
