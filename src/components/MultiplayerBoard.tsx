@@ -141,8 +141,9 @@ export default function MultiplayerBoard({
               <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${playerColor(p.index)}`}>
                 {p.index + 1}
               </span>
-              <span className={`font-medium ${playerColor(p.index)}`}>{p.name}</span>
-              {p.id === hostId && <span className="text-xs text-slate-500 ml-auto">host</span>}
+              <span className={`font-medium ${playerColor(p.index)} ${!p.connected ? 'opacity-40' : ''}`}>{p.name}</span>
+              {!p.connected && <span className="text-xs text-slate-500">reconnecting…</span>}
+              {p.id === hostId && p.connected && <span className="text-xs text-slate-500 ml-auto">host</span>}
               {p.index === myIndex && <span className="text-xs text-emerald-500 ml-auto">you</span>}
             </div>
           ))}
@@ -230,6 +231,7 @@ export default function MultiplayerBoard({
               <div className="text-base font-bold leading-none">{p.score}</div>
               <div className="text-xs opacity-80 mt-0.5 max-w-[4rem] truncate">{p.name}</div>
               {p.index === myIndex && <div className="text-xs opacity-60">you</div>}
+              {!p.connected && <div className="text-xs text-slate-500">···</div>}
             </div>
           ))}
         </div>

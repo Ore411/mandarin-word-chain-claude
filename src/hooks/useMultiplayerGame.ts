@@ -33,9 +33,11 @@ export interface ChainEntry {
 
 export interface PlayerInfo {
   id: string;
+  clientId: string;
   index: number;
   name: string;
   score: number;
+  connected: boolean;
 }
 
 export type RoomStatus = 'waiting' | 'playing' | 'game-over';
@@ -57,6 +59,15 @@ type ServerMsg =
 
 const PARTYKIT_HOST = process.env.NEXT_PUBLIC_PARTYKIT_HOST ?? 'mandarin-word-chain.ore411.partykit.dev';
 
+function getOrCreateClientId(): string {
+  const key = 'mpClientId';
+  const existing = localStorage.getItem(key);
+  if (existing) return existing;
+  const id = crypto.randomUUID();
+  localStorage.setItem(key, id);
+  return id;
+}
+
 export function useMultiplayerGame(roomId: string, playerName: string) {
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [myId, setMyId] = useState<string | null>(null);
@@ -66,6 +77,14 @@ export function useMultiplayerGame(roomId: string, playerName: string) {
   const ws = usePartySocket({
     host: PARTYKIT_HOST,
     room: roomId,
+    onOpen() {
+      // On reconnect, PartySocket re-fires onOpen — re-send join so server
+      // can re-associate the new connection id with this player's slot.
+      if (joined) {
+        const clientId = getOrCreateClientId();
+        ws.send(JSON.stringify({ type: 'join', name: playerName, clientId }));
+      }
+    },
     onMessage(e: MessageEvent) {
       const msg = JSON.parse(e.data as string) as ServerMsg;
       if (msg.type === 'state') {
@@ -82,7 +101,8 @@ export function useMultiplayerGame(roomId: string, playerName: string) {
     const id = (ws as unknown as { id: string }).id;
     if (!id) return;
     setMyId(id);
-    ws.send(JSON.stringify({ type: 'join', name: playerName }));
+    const clientId = getOrCreateClientId();
+    ws.send(JSON.stringify({ type: 'join', name: playerName, clientId }));
     setJoined(true);
   }, [ws, playerName, joined]);
 
@@ -94,9 +114,12 @@ export function useMultiplayerGame(roomId: string, playerName: string) {
     ws?.send(JSON.stringify({ type: 'start' }));
   }, [ws]);
 
-  const myIndex: number | null = roomState?.players.find(p => p.id === myId)?.index ?? null;
+  // Identify ourselves by clientId (stable across reconnects), not connection id
+  const [myClientId] = useState(() => typeof window !== 'undefined' ? getOrCreateClientId() : '');
+  const myPlayer = roomState?.players.find(p => p.clientId === myClientId);
+  const myIndex: number | null = myPlayer?.index ?? null;
   const isMyTurn = myIndex !== null && roomState?.currentPlayerIndex === myIndex;
-  const isHost = myId !== null && roomState?.hostId === myId;
+  const isHost = myPlayer !== undefined && roomState?.hostId === myPlayer.id;
 
   return { roomState, myId, myIndex, isMyTurn, isHost, serverError, submitWord, startGame };
 }

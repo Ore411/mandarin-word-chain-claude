@@ -33,10 +33,12 @@ interface ChainEntry {
 type RoomStatus = 'waiting' | 'playing' | 'game-over';
 
 export interface PlayerInfo {
-  id: string;
+  id: string;       // current connection id (changes on reconnect)
+  clientId: string; // stable id from localStorage (survives reconnect)
   index: number;
   name: string;
   score: number;
+  connected: boolean;
 }
 
 export interface RoomState {
@@ -57,7 +59,7 @@ type ServerMsg =
   | { type: 'error'; message: string };
 
 type ClientMsg =
-  | { type: 'join'; name: string }
+  | { type: 'join'; name: string; clientId: string }
   | { type: 'start' }
   | { type: 'play'; word: string };
 
@@ -221,7 +223,7 @@ export default class GameRoom implements Party.Server {
     let msg: ClientMsg;
     try { msg = JSON.parse(raw) as ClientMsg; } catch { return; }
 
-    if (msg.type === 'join') await this.handleJoin(sender, msg.name);
+    if (msg.type === 'join') await this.handleJoin(sender, msg.name, msg.clientId);
     else if (msg.type === 'start') await this.handleStart(sender);
     else if (msg.type === 'play') await this.handlePlay(sender, msg.word);
   }
@@ -231,16 +233,13 @@ export default class GameRoom implements Party.Server {
     if (!player) return;
 
     if (this.state.status === 'playing') {
-      this.stopTimer();
-      this.state.status = 'game-over';
-      this.state.gameOverReason = `${player.name} disconnected`;
+      // Mark offline but keep in game — timer will handle their turn naturally
+      player.connected = false;
       this.broadcast();
       await this.saveState();
     } else if (this.state.status === 'waiting') {
       this.state.players = this.state.players.filter(p => p.id !== conn.id);
-      // Re-index remaining players
       this.state.players.forEach((p, i) => { p.index = i; });
-      // If host left, assign new host
       if (this.state.hostId === conn.id) {
         this.state.hostId = this.state.players[0]?.id ?? null;
       }
@@ -251,7 +250,22 @@ export default class GameRoom implements Party.Server {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
-  private async handleJoin(conn: Party.Connection, name: string) {
+  private async handleJoin(conn: Party.Connection, name: string, clientId: string) {
+    // Reconnect: player already exists with this clientId
+    const existing = this.state.players.find(p => p.clientId === clientId);
+    if (existing) {
+      existing.id = conn.id;
+      existing.connected = true;
+      // Restore host mapping if they were the host
+      if (this.state.hostId === existing.id || !this.state.hostId) {
+        this.state.hostId = conn.id;
+      }
+      conn.send(JSON.stringify({ type: 'state', state: this.state } satisfies ServerMsg));
+      this.broadcast();
+      await this.saveState();
+      return;
+    }
+
     if (this.state.status !== 'waiting') {
       conn.send(JSON.stringify({ type: 'error', message: 'Game already in progress' } satisfies ServerMsg));
       return;
@@ -260,11 +274,10 @@ export default class GameRoom implements Party.Server {
       conn.send(JSON.stringify({ type: 'error', message: 'Room is full (max 10 players)' } satisfies ServerMsg));
       return;
     }
-    if (this.state.players.find(p => p.id === conn.id)) return; // already joined
 
     const index = this.state.players.length;
     const trimmedName = name.trim() || `Player ${index + 1}`;
-    this.state.players.push({ id: conn.id, index, name: trimmedName, score: 0 });
+    this.state.players.push({ id: conn.id, clientId, index, name: trimmedName, score: 0, connected: true });
 
     if (!this.state.hostId) this.state.hostId = conn.id;
 
@@ -317,6 +330,7 @@ export default class GameRoom implements Party.Server {
 
     this.stopTimer();
     this.state.lastMoveError = null;
+    player.connected = true;
 
     const base = BASE_SCORES[connType];
     const lb = lengthBonus(entry.wordLength);
