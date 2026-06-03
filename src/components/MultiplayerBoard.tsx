@@ -60,7 +60,7 @@ function SpeedMultiplierBadge({ timeRemaining, turnSeconds }: { timeRemaining: n
   const gracePeriod = 5;
   const mult = timeRemaining >= turnSeconds - gracePeriod
     ? 2.0
-    : Math.round((1 + timeRemaining / (turnSeconds - gracePeriod)) * 10) / 10;
+    : Math.round((0.1 + (timeRemaining / (turnSeconds - gracePeriod)) * 1.9) * 10) / 10;
   const color = mult >= 1.8 ? 'text-emerald-300 bg-emerald-900/60' :
                 mult >= 1.4 ? 'text-amber-300 bg-amber-900/60' : 'text-slate-400 bg-slate-800';
   return (

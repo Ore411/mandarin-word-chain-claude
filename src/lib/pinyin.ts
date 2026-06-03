@@ -4,10 +4,10 @@ export interface Syllable {
   tone: number | null;
 }
 
-export type InitialFamily = 'sibilant' | 'palatal' | 'velar' | 'dental' | 'lip' | 'none';
+export type InitialFamily = 'retroflex' | 'sibilant' | 'palatal' | 'velar' | 'dental' | 'lip' | 'none';
 
 const INITIAL_FAMILIES: Record<string, InitialFamily> = {
-  zh: 'sibilant', ch: 'sibilant', sh: 'sibilant', r: 'sibilant',
+  zh: 'retroflex', ch: 'retroflex', sh: 'retroflex', r: 'retroflex',
   z: 'sibilant', c: 'sibilant', s: 'sibilant',
   j: 'palatal', q: 'palatal', x: 'palatal', y: 'palatal',
   g: 'velar', k: 'velar', h: 'velar', w: 'velar',
@@ -48,12 +48,13 @@ export function finalsRelation(a: string, b: string): FinalRelation {
 }
 
 const FAMILY_DISPLAY: Record<InitialFamily, { name: string; members: string[] }> = {
-  sibilant: { name: 'Sibilant',   members: ['zh', 'ch', 'sh', 'r', 'z', 'c', 's'] },
-  palatal:  { name: 'Palatal',    members: ['j', 'q', 'x', 'y'] },
-  velar:    { name: 'Velar/Back', members: ['g', 'k', 'h', 'w'] },
-  dental:   { name: 'Dental',     members: ['d', 't', 'n', 'l'] },
-  lip:      { name: 'Lip',        members: ['b', 'p', 'm', 'f'] },
-  none:     { name: 'None',       members: [] },
+  retroflex: { name: 'Retroflex', members: ['zh', 'ch', 'sh', 'r'] },
+  sibilant:  { name: 'Sibilant',  members: ['z', 'c', 's'] },
+  palatal:   { name: 'Palatal',   members: ['j', 'q', 'x', 'y'] },
+  velar:     { name: 'Velar',     members: ['g', 'k', 'h', 'w'] },
+  dental:    { name: 'Dental',    members: ['d', 't', 'n', 'l'] },
+  lip:       { name: 'Lip',       members: ['b', 'p', 'm', 'f'] },
+  none:      { name: 'None',      members: [] },
 };
 
 export function getInitialFamilyDisplay(initial: string): { family: string; members: string[] } {

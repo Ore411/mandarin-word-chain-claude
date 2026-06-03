@@ -79,7 +79,7 @@ const BASE_SCORES: Record<ConnectionType, number> = {
 };
 
 const INITIAL_FAMILIES: Record<string, string> = {
-  zh: 'sibilant', ch: 'sibilant', sh: 'sibilant', r: 'sibilant',
+  zh: 'retroflex', ch: 'retroflex', sh: 'retroflex', r: 'retroflex',
   z: 'sibilant', c: 'sibilant', s: 'sibilant',
   j: 'palatal', q: 'palatal', x: 'palatal', y: 'palatal',
   g: 'velar', k: 'velar', h: 'velar', w: 'velar',
@@ -129,7 +129,7 @@ function lengthBonus(n: number): number {
 function speedMultiplier(timeRemaining: number, turnSeconds: number): number {
   const gracePeriod = 5;
   if (timeRemaining >= turnSeconds - gracePeriod) return 2.0;
-  return Math.round((1 + timeRemaining / (turnSeconds - gracePeriod)) * 10) / 10;
+  return Math.round((0.1 + (timeRemaining / (turnSeconds - gracePeriod)) * 1.9) * 10) / 10;
 }
 
 function hasValidMoves(prev: WordEntry, dict: WordEntry[], usedWords: Set<string>): boolean {
