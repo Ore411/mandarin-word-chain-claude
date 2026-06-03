@@ -1,7 +1,83 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+
+function randomRoomId() {
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  return Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+function OnlineSection() {
+  const router = useRouter();
+  const [joinCode, setJoinCode] = useState('');
+  const [expanded, setExpanded] = useState(false);
+
+  function createRoom() {
+    router.push(`/room/${randomRoomId()}`);
+  }
+
+  function joinRoom(e: React.FormEvent) {
+    e.preventDefault();
+    const code = joinCode.trim().toLowerCase();
+    if (code.length !== 4) return;
+    router.push(`/room/${code}`);
+  }
+
+  return (
+    <div>
+      <button
+        onClick={() => setExpanded(v => !v)}
+        className="group w-full flex items-center gap-4 p-5 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-emerald-500 rounded-2xl transition-all text-left"
+      >
+        <span className="text-3xl">🌐</span>
+        <div className="flex-1">
+          <div className="flex items-baseline gap-2">
+            <span className="font-semibold text-lg">Play Online</span>
+            <span className="text-slate-500 text-sm">联机对战</span>
+          </div>
+          <p className="text-slate-400 text-sm mt-0.5">Challenge a friend on another device in real time.</p>
+        </div>
+        <span className={`text-slate-400 text-lg transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}>→</span>
+      </button>
+
+      {expanded && (
+        <div className="mt-2 ml-4 flex flex-col gap-3">
+          <button
+            onClick={createRoom}
+            className="flex items-center gap-4 p-4 bg-slate-800/60 hover:bg-slate-700 border border-slate-700/60 hover:border-emerald-500 rounded-xl transition-all text-left"
+          >
+            <span className="text-2xl">➕</span>
+            <div>
+              <div className="font-semibold text-white">Create Room</div>
+              <p className="text-slate-400 text-xs mt-0.5">Get a 4-letter code to share with your friend.</p>
+            </div>
+          </button>
+
+          <form onSubmit={joinRoom} className="flex gap-2 p-4 bg-slate-800/60 border border-slate-700/60 rounded-xl">
+            <span className="text-2xl self-center">🔗</span>
+            <input
+              type="text"
+              value={joinCode}
+              onChange={e => setJoinCode(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 4))}
+              placeholder="Room code"
+              maxLength={4}
+              className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono uppercase tracking-widest text-center"
+            />
+            <button
+              type="submit"
+              disabled={joinCode.length !== 4}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-colors text-sm"
+            >
+              Join
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const VS_SUBMODES = [
   {
@@ -76,6 +152,9 @@ export default function Home() {
 
         {/* Mode cards */}
         <div className="flex flex-col gap-3 mb-10">
+          {/* Online multiplayer */}
+          <OnlineSection />
+
           {/* vs Computer — expandable */}
           <div>
             <button
