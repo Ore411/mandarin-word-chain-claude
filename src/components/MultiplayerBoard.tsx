@@ -131,7 +131,7 @@ interface Props {
   serverError: string | null;
   roomId: string;
   onSubmit: (word: string) => void;
-  onStart: (turnSeconds: 30 | 60) => void;
+  onStart: (turnSeconds: 30 | 60, targetScore: number | null) => void;
   onRematch: () => void;
   onLeave: () => void;
 }
@@ -141,6 +141,7 @@ export default function MultiplayerBoard({
 }: Props) {
   const [input, setInput] = useState('');
   const [selectedTime, setSelectedTime] = useState<30 | 60>(30);
+  const [selectedTarget, setSelectedTarget] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const chainEndRef = useRef<HTMLDivElement>(null);
 
@@ -156,7 +157,7 @@ export default function MultiplayerBoard({
     if (e.key === 'Enter') handleSubmit();
   }
 
-  const { players, chain, currentPlayerIndex, turnSeconds, timeRemaining, status, gameOverReason, lastMoveError, hostId } = roomState;
+  const { players, chain, currentPlayerIndex, turnSeconds, timeRemaining, targetScore, status, gameOverReason, lastMoveError, hostId } = roomState;
   const currentTurnPlayer = players.find(p => p.index === currentPlayerIndex);
   const currentWord = chain[chain.length - 1];
 
@@ -194,9 +195,53 @@ export default function MultiplayerBoard({
           )}
         </div>
 
-        {/* Time picker + start (host only) */}
+        {/* Settings + start (host only) */}
         {isHost ? (
-          <div className="flex flex-col items-center gap-3 w-full max-w-sm">
+          <div className="flex flex-col items-center gap-4 w-full max-w-sm">
+            {/* Game mode */}
+            <div className="w-full">
+              <p className="text-xs text-slate-400 uppercase tracking-wider mb-2 text-center">Game mode</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSelectedTarget(null)}
+                  className={`flex-1 py-2 rounded-xl font-semibold text-sm transition-colors ${
+                    selectedTarget === null ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  Endless
+                </button>
+                <button
+                  onClick={() => setSelectedTarget(t => t ?? 100)}
+                  className={`flex-1 py-2 rounded-xl font-semibold text-sm transition-colors ${
+                    selectedTarget !== null ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  First to X pts
+                </button>
+              </div>
+            </div>
+
+            {/* Target score (only when First-to-X selected) */}
+            {selectedTarget !== null && (
+              <div className="w-full">
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-2 text-center">Target score</p>
+                <div className="flex gap-2">
+                  {[50, 100, 200].map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setSelectedTarget(t)}
+                      className={`flex-1 py-2 rounded-xl font-semibold text-sm transition-colors ${
+                        selectedTarget === t ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      {t} pts
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Time per turn */}
             <div className="w-full">
               <p className="text-xs text-slate-400 uppercase tracking-wider mb-2 text-center">Time per turn</p>
               <div className="flex gap-2">
@@ -205,9 +250,7 @@ export default function MultiplayerBoard({
                     key={t}
                     onClick={() => setSelectedTime(t)}
                     className={`flex-1 py-2 rounded-xl font-semibold text-sm transition-colors ${
-                      selectedTime === t
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      selectedTime === t ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
                   >
                     {t === 30 ? '30 seconds' : '1 minute'}
@@ -215,8 +258,9 @@ export default function MultiplayerBoard({
                 ))}
               </div>
             </div>
+
             <button
-              onClick={() => onStart(selectedTime)}
+              onClick={() => onStart(selectedTime, selectedTarget)}
               disabled={players.length < 2}
               className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-colors"
             >
@@ -254,19 +298,31 @@ export default function MultiplayerBoard({
 
         {/* Final leaderboard */}
         <div className="w-full max-w-sm flex flex-col gap-2">
-          {sorted.map((p, rank) => (
-            <div key={p.id} className={`flex items-center gap-3 px-4 py-3 rounded-xl ${playerBg(p.index)}`}>
-              <span className="text-slate-400 text-sm w-5 text-right">{rank + 1}</span>
-              <div className="flex-1 text-left">
-                <span className={`font-medium ${playerColor(p.index)}`}>
-                  {p.name}{p.index === myIndex ? ' (you)' : ''}
-                </span>
-                {p.eliminated && <span className="text-xs text-red-400 ml-2">eliminated</span>}
-                <div><Strikes count={p.timeouts} /></div>
+          {sorted.map((p, rank) => {
+            const medal = rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : null;
+            const pct = targetScore ? Math.min(100, (p.score / targetScore) * 100) : null;
+            return (
+              <div key={p.id} className={`flex flex-col px-4 py-3 rounded-xl ${rank === 0 ? 'ring-2 ring-emerald-500' : ''} ${playerBg(p.index)}`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-lg w-6 text-center">{medal ?? <span className="text-slate-500 text-sm">{rank + 1}</span>}</span>
+                  <div className="flex-1 text-left">
+                    <span className={`font-semibold ${playerColor(p.index)}`}>
+                      {p.name}{p.index === myIndex ? ' (you)' : ''}
+                    </span>
+                    {p.eliminated && <span className="text-xs text-red-400 ml-2">eliminated</span>}
+                    <div><Strikes count={p.timeouts} /></div>
+                  </div>
+                  <span className={`font-bold text-xl ${rank === 0 ? playerColor(p.index) : 'text-slate-300'}`}>{p.score}</span>
+                  {targetScore && <span className="text-slate-500 text-xs">/ {targetScore}</span>}
+                </div>
+                {pct !== null && (
+                  <div className="mt-2 w-full bg-slate-700 rounded-full h-1.5 overflow-hidden">
+                    <div className={`h-full rounded-full ${rank === 0 ? 'bg-emerald-400' : 'bg-slate-500'}`} style={{ width: `${pct}%` }} />
+                  </div>
+                )}
               </div>
-              <span className={`font-bold text-lg ${playerColor(p.index)}`}>{p.score}</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="text-slate-500 text-sm">Chain length: {chain.length} words</div>
@@ -309,6 +365,26 @@ export default function MultiplayerBoard({
             </div>
           ))}
         </div>
+
+        {/* Target score progress (first-to-X mode) */}
+        {targetScore && (
+          <div className="mb-2">
+            <div className="flex justify-between text-xs text-slate-500 mb-1">
+              <span>First to {targetScore} pts</span>
+              <span>{Math.max(...players.map(p => p.score))} / {targetScore}</span>
+            </div>
+            <div className="flex gap-1">
+              {players.map(p => (
+                <div key={p.id} className="flex-1 bg-slate-700 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${playerColor(p.index).replace('text-', 'bg-')}`}
+                    style={{ width: `${Math.min(100, (p.score / targetScore) * 100)}%` }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Turn + multiplier */}
         <div className="flex items-center justify-between mb-2">

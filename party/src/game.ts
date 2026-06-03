@@ -51,6 +51,7 @@ export interface RoomState {
   currentPlayerIndex: number;
   turnSeconds: number;
   timeRemaining: number;
+  targetScore: number | null;
   gameOverReason: string | null;
   lastMoveError: string | null;
 }
@@ -63,7 +64,7 @@ type ServerMsg =
 
 type ClientMsg =
   | { type: 'join'; name: string; clientId: string }
-  | { type: 'start'; turnSeconds: number }
+  | { type: 'start'; turnSeconds: number; targetScore: number | null }
   | { type: 'rematch' }
   | { type: 'play'; word: string };
 
@@ -219,6 +220,7 @@ export default class GameRoom implements Party.Server {
     currentPlayerIndex: 0,
     turnSeconds: TURN_SECONDS,
     timeRemaining: TURN_SECONDS,
+    targetScore: null,
     gameOverReason: null,
     lastMoveError: null,
   };
@@ -249,7 +251,7 @@ export default class GameRoom implements Party.Server {
     try { msg = JSON.parse(raw) as ClientMsg; } catch { return; }
 
     if (msg.type === 'join') await this.handleJoin(sender, msg.name, msg.clientId);
-    else if (msg.type === 'start') await this.handleStart(sender, msg.turnSeconds);
+    else if (msg.type === 'start') await this.handleStart(sender, msg.turnSeconds, msg.targetScore);
     else if (msg.type === 'rematch') await this.handleRematch(sender);
     else if (msg.type === 'play') await this.handlePlay(sender, msg.word);
   }
@@ -311,7 +313,7 @@ export default class GameRoom implements Party.Server {
     await this.saveState();
   }
 
-  private async handleStart(conn: Party.Connection, turnSeconds: number) {
+  private async handleStart(conn: Party.Connection, turnSeconds: number, targetScore: number | null) {
     if (this.state.status !== 'waiting') return;
     if (this.state.hostId !== conn.id) {
       conn.send(JSON.stringify({ type: 'error', message: 'Only the host can start the game' } satisfies ServerMsg));
@@ -322,7 +324,8 @@ export default class GameRoom implements Party.Server {
       return;
     }
     const validSeconds = [30, 60].includes(turnSeconds) ? turnSeconds : TURN_SECONDS;
-    await this.startGame(validSeconds);
+    const validTarget = targetScore && [50, 100, 200].includes(targetScore) ? targetScore : null;
+    await this.startGame(validSeconds, validTarget);
   }
 
   private async handleRematch(conn: Party.Connection) {
@@ -335,6 +338,7 @@ export default class GameRoom implements Party.Server {
     this.usedWords = new Set();
     this.state.status = 'waiting';
     this.state.chain = [];
+    this.state.targetScore = null;
     this.state.gameOverReason = null;
     this.state.lastMoveError = null;
     this.state.currentPlayerIndex = 0;
@@ -394,6 +398,15 @@ export default class GameRoom implements Party.Server {
     this.usedWords.add(simplified);
     this.state.players[player.index].score += score;
 
+    // Check if player hit target score (first-to-X mode)
+    if (this.state.targetScore !== null && this.state.players[player.index].score >= this.state.targetScore) {
+      this.state.status = 'game-over';
+      this.state.gameOverReason = `${player.name} reached ${this.state.targetScore} points!`;
+      this.broadcast();
+      await this.saveState();
+      return;
+    }
+
     // Check if the chain is now stuck (no valid moves from this new word)
     if (!hasValidMoves(entry, this.dict, this.usedWords)) {
       this.state.status = 'game-over';
@@ -411,13 +424,14 @@ export default class GameRoom implements Party.Server {
 
   // ── Game flow ──────────────────────────────────────────────────────────────
 
-  private async startGame(turnSeconds: number = TURN_SECONDS) {
+  private async startGame(turnSeconds: number = TURN_SECONDS, targetScore: number | null = null) {
     const startWord = pickStartingWord(this.dict);
     this.usedWords = new Set([startWord.simplified]);
 
     const firstPlayer = Math.floor(Math.random() * this.state.players.length);
     this.state.status = 'playing';
     this.state.turnSeconds = turnSeconds;
+    this.state.targetScore = targetScore;
     this.state.chain = [{
       word: startWord, playedBy: 'start', playerIndex: firstPlayer,
       score: 0, connectionType: '', speedMultiplier: 1,

@@ -52,6 +52,7 @@ export interface RoomState {
   currentPlayerIndex: number;
   turnSeconds: number;
   timeRemaining: number;
+  targetScore: number | null;
   gameOverReason: string | null;
   lastMoveError: string | null;
 }
@@ -113,8 +114,8 @@ export function useMultiplayerGame(roomId: string, playerName: string) {
     ws?.send(JSON.stringify({ type: 'play', word }));
   }, [ws]);
 
-  const startGame = useCallback((turnSeconds: 30 | 60) => {
-    ws?.send(JSON.stringify({ type: 'start', turnSeconds }));
+  const startGame = useCallback((turnSeconds: 30 | 60, targetScore: number | null) => {
+    ws?.send(JSON.stringify({ type: 'start', turnSeconds, targetScore }));
   }, [ws]);
 
   const rematch = useCallback(() => {
