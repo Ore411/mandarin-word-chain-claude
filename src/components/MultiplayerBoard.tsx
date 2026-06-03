@@ -352,10 +352,10 @@ export default function MultiplayerBoard({
             {/* Word display */}
             <div className="px-4 pt-4 pb-3 flex items-start gap-4">
               <div className="flex flex-col items-center">
-                <span className="text-5xl font-bold text-white tracking-wider leading-none">
+                <span className="text-6xl font-bold text-emerald-300 tracking-wider leading-none drop-shadow-[0_0_12px_rgba(110,231,183,0.4)]">
                   {currentWord.word.simplified}
                 </span>
-                <span className="text-emerald-400 text-base font-mono mt-1">
+                <span className="text-slate-400 text-sm font-mono mt-1">
                   {currentWord.word.pinyin}
                 </span>
               </div>
