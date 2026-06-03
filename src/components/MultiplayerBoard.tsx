@@ -33,9 +33,10 @@ const CONNECTION_COLORS: Record<string, string> = {
   familyInitialStrongFinal: 'text-violet-300', weakMusicalFinal: 'text-amber-400',
 };
 
-function TimerBar({ timeRemaining }: { timeRemaining: number }) {
-  const pct = (timeRemaining / 30) * 100;
-  const color = timeRemaining > 15 ? 'bg-emerald-500' : timeRemaining > 8 ? 'bg-amber-400' : 'bg-red-500';
+function TimerBar({ timeRemaining, turnSeconds }: { timeRemaining: number; turnSeconds: number }) {
+  const pct = (timeRemaining / turnSeconds) * 100;
+  const half = turnSeconds / 2;
+  const color = timeRemaining > half ? 'bg-emerald-500' : timeRemaining > turnSeconds * 0.27 ? 'bg-amber-400' : 'bg-red-500';
   return (
     <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden">
       <div className={`h-full rounded-full transition-all duration-1000 ease-linear ${color}`} style={{ width: `${pct}%` }} />
@@ -43,8 +44,8 @@ function TimerBar({ timeRemaining }: { timeRemaining: number }) {
   );
 }
 
-function SpeedMultiplierBadge({ timeRemaining }: { timeRemaining: number }) {
-  const mult = Math.round((1 + timeRemaining / 30) * 10) / 10;
+function SpeedMultiplierBadge({ timeRemaining, turnSeconds }: { timeRemaining: number; turnSeconds: number }) {
+  const mult = Math.round((1 + timeRemaining / turnSeconds) * 10) / 10;
   const color = mult >= 1.8 ? 'text-emerald-300 bg-emerald-900/60' :
                 mult >= 1.4 ? 'text-amber-300 bg-amber-900/60' : 'text-slate-400 bg-slate-800';
   return (
@@ -94,7 +95,7 @@ interface Props {
   serverError: string | null;
   roomId: string;
   onSubmit: (word: string) => void;
-  onStart: () => void;
+  onStart: (turnSeconds: 30 | 60) => void;
   onLeave: () => void;
 }
 
@@ -102,6 +103,7 @@ export default function MultiplayerBoard({
   roomState, myIndex, isMyTurn, isHost, serverError, roomId, onSubmit, onStart, onLeave,
 }: Props) {
   const [input, setInput] = useState('');
+  const [selectedTime, setSelectedTime] = useState<30 | 60>(30);
   const inputRef = useRef<HTMLInputElement>(null);
   const chainEndRef = useRef<HTMLDivElement>(null);
 
@@ -117,7 +119,7 @@ export default function MultiplayerBoard({
     if (e.key === 'Enter') handleSubmit();
   }
 
-  const { players, chain, currentPlayerIndex, timeRemaining, status, gameOverReason, lastMoveError, hostId } = roomState;
+  const { players, chain, currentPlayerIndex, turnSeconds, timeRemaining, status, gameOverReason, lastMoveError, hostId } = roomState;
   const currentTurnPlayer = players.find(p => p.index === currentPlayerIndex);
   const currentWord = chain[chain.length - 1];
 
@@ -155,15 +157,35 @@ export default function MultiplayerBoard({
           )}
         </div>
 
-        {/* Start button (host only) */}
+        {/* Time picker + start (host only) */}
         {isHost ? (
-          <button
-            onClick={onStart}
-            disabled={players.length < 2}
-            className="px-8 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-colors"
-          >
-            {players.length < 2 ? 'Need at least 2 players' : `Start Game (${players.length} players)`}
-          </button>
+          <div className="flex flex-col items-center gap-3 w-full max-w-sm">
+            <div className="w-full">
+              <p className="text-xs text-slate-400 uppercase tracking-wider mb-2 text-center">Time per turn</p>
+              <div className="flex gap-2">
+                {([30, 60] as const).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setSelectedTime(t)}
+                    className={`flex-1 py-2 rounded-xl font-semibold text-sm transition-colors ${
+                      selectedTime === t
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                  >
+                    {t === 30 ? '30 seconds' : '1 minute'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button
+              onClick={() => onStart(selectedTime)}
+              disabled={players.length < 2}
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-colors"
+            >
+              {players.length < 2 ? 'Need at least 2 players' : `Start Game (${players.length} players)`}
+            </button>
+          </div>
         ) : (
           <p className="text-slate-400 text-sm">Waiting for host to start…</p>
         )}
@@ -243,13 +265,13 @@ export default function MultiplayerBoard({
           </div>
           <div className="flex items-center gap-2">
             <span className="text-slate-500 text-xs">Speed bonus</span>
-            <SpeedMultiplierBadge timeRemaining={timeRemaining} />
+            <SpeedMultiplierBadge timeRemaining={timeRemaining} turnSeconds={turnSeconds ?? 30} />
           </div>
         </div>
 
         {/* Timer */}
         <div className="flex items-center gap-2">
-          <TimerBar timeRemaining={timeRemaining} />
+          <TimerBar timeRemaining={timeRemaining} turnSeconds={turnSeconds ?? 30} />
           <span className={`text-sm font-mono w-6 text-right ${timeRemaining <= 8 ? 'text-red-400' : 'text-slate-400'}`}>
             {timeRemaining}
           </span>

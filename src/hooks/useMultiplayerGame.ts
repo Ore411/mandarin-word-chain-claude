@@ -48,6 +48,7 @@ export interface RoomState {
   players: PlayerInfo[];
   chain: ChainEntry[];
   currentPlayerIndex: number;
+  turnSeconds: number;
   timeRemaining: number;
   gameOverReason: string | null;
   lastMoveError: string | null;
@@ -110,8 +111,8 @@ export function useMultiplayerGame(roomId: string, playerName: string) {
     ws?.send(JSON.stringify({ type: 'play', word }));
   }, [ws]);
 
-  const startGame = useCallback(() => {
-    ws?.send(JSON.stringify({ type: 'start' }));
+  const startGame = useCallback((turnSeconds: 30 | 60) => {
+    ws?.send(JSON.stringify({ type: 'start', turnSeconds }));
   }, [ws]);
 
   // Identify ourselves by clientId (stable across reconnects), not connection id

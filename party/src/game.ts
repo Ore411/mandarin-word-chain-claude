@@ -47,6 +47,7 @@ export interface RoomState {
   players: PlayerInfo[];
   chain: ChainEntry[];
   currentPlayerIndex: number;
+  turnSeconds: number;
   timeRemaining: number;
   gameOverReason: string | null;
   lastMoveError: string | null;
@@ -60,7 +61,7 @@ type ServerMsg =
 
 type ClientMsg =
   | { type: 'join'; name: string; clientId: string }
-  | { type: 'start' }
+  | { type: 'start'; turnSeconds: number }
   | { type: 'play'; word: string };
 
 // ── Game logic ───────────────────────────────────────────────────────────────
@@ -123,9 +124,8 @@ function lengthBonus(n: number): number {
   if (n === 2) return 0; if (n === 3) return 2; if (n === 4) return 4; return 6;
 }
 
-function speedMultiplier(timeRemaining: number): number {
-  // 2.0x at full time (30s), 1.0x at timeout (0s)
-  return Math.round((1 + timeRemaining / 30) * 10) / 10;
+function speedMultiplier(timeRemaining: number, turnSeconds: number): number {
+  return Math.round((1 + timeRemaining / turnSeconds) * 10) / 10;
 }
 
 // ── Pinyin parser ────────────────────────────────────────────────────────────
@@ -193,6 +193,7 @@ export default class GameRoom implements Party.Server {
     players: [],
     chain: [],
     currentPlayerIndex: 0,
+    turnSeconds: TURN_SECONDS,
     timeRemaining: TURN_SECONDS,
     gameOverReason: null,
     lastMoveError: null,
@@ -224,7 +225,7 @@ export default class GameRoom implements Party.Server {
     try { msg = JSON.parse(raw) as ClientMsg; } catch { return; }
 
     if (msg.type === 'join') await this.handleJoin(sender, msg.name, msg.clientId);
-    else if (msg.type === 'start') await this.handleStart(sender);
+    else if (msg.type === 'start') await this.handleStart(sender, msg.turnSeconds);
     else if (msg.type === 'play') await this.handlePlay(sender, msg.word);
   }
 
@@ -285,7 +286,7 @@ export default class GameRoom implements Party.Server {
     await this.saveState();
   }
 
-  private async handleStart(conn: Party.Connection) {
+  private async handleStart(conn: Party.Connection, turnSeconds: number) {
     if (this.state.status !== 'waiting') return;
     if (this.state.hostId !== conn.id) {
       conn.send(JSON.stringify({ type: 'error', message: 'Only the host can start the game' } satisfies ServerMsg));
@@ -295,7 +296,8 @@ export default class GameRoom implements Party.Server {
       conn.send(JSON.stringify({ type: 'error', message: 'Need at least 2 players to start' } satisfies ServerMsg));
       return;
     }
-    await this.startGame();
+    const validSeconds = [30, 60].includes(turnSeconds) ? turnSeconds : TURN_SECONDS;
+    await this.startGame(validSeconds);
   }
 
   private async handlePlay(conn: Party.Connection, simplified: string) {
@@ -335,7 +337,7 @@ export default class GameRoom implements Party.Server {
     const base = BASE_SCORES[connType];
     const lb = lengthBonus(entry.wordLength);
     const cb = entry.isChengyu ? 5 : 0;
-    const mult = speedMultiplier(this.state.timeRemaining);
+    const mult = speedMultiplier(this.state.timeRemaining, this.state.turnSeconds);
     const score = Math.round((base + lb + cb) * mult);
 
     this.state.chain.push({
@@ -355,17 +357,18 @@ export default class GameRoom implements Party.Server {
 
   // ── Game flow ──────────────────────────────────────────────────────────────
 
-  private async startGame() {
+  private async startGame(turnSeconds: number = TURN_SECONDS) {
     const startWord = pickStartingWord(this.dict);
     this.usedWords = new Set([startWord.simplified]);
 
     this.state.status = 'playing';
+    this.state.turnSeconds = turnSeconds;
     this.state.chain = [{
       word: startWord, playedBy: 'start', playerIndex: 0,
       score: 0, connectionType: '', speedMultiplier: 1,
     }];
     this.state.currentPlayerIndex = 0;
-    this.state.timeRemaining = TURN_SECONDS;
+    this.state.timeRemaining = turnSeconds;
     this.state.gameOverReason = null;
     this.state.lastMoveError = null;
     this.state.players.forEach(p => { p.score = 0; });
@@ -377,7 +380,7 @@ export default class GameRoom implements Party.Server {
 
   private startTimer() {
     this.stopTimer();
-    this.state.timeRemaining = TURN_SECONDS;
+    this.state.timeRemaining = this.state.turnSeconds;
     this.timerInterval = setInterval(async () => {
       this.state.timeRemaining -= 1;
       this.broadcast();
