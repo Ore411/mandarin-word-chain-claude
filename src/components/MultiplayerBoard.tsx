@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useRef, useEffect, KeyboardEvent } from 'react';
+
+function shortMeaning(english: string, n = 2) {
+  return english.split(';').slice(0, n).join(';').trim();
+}
 import type { RoomState, ChainEntry, PlayerInfo } from '@/hooks/useMultiplayerGame';
 import { getInitialFamilyDisplay, getCompatibleFinals } from '@/lib/pinyin';
 
@@ -111,7 +115,7 @@ function ChainRow({ entry, players, isLast }: { entry: ChainEntry; players: Play
           <HskBadge level={entry.word.hskLevel} />
         </div>
         <span className="text-slate-400 text-xs">{entry.word.pinyin}</span>
-        <span className="text-slate-500 text-xs truncate max-w-xs">{entry.word.english}</span>
+        <span className="text-slate-500 text-xs truncate max-w-xs">{shortMeaning(entry.word.english)}</span>
         {entry.connectionType && CONNECTION_LABELS[entry.connectionType] && (
           <span className={`text-xs mt-0.5 ${CONNECTION_COLORS[entry.connectionType] ?? ''}`}>
             {CONNECTION_LABELS[entry.connectionType]}
@@ -459,7 +463,7 @@ export default function MultiplayerBoard({
                 </span>
                 <span className="text-slate-400 text-xs font-mono leading-tight shrink-0">{currentWord.word.pinyin}</span>
                 <span className="text-white text-lg leading-snug font-semibold">
-                  {currentWord.word.english}
+                  {shortMeaning(currentWord.word.english)}
                 </span>
               </div>
               {/* Chain target */}

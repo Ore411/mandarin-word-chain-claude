@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef, KeyboardEvent } from 'react';
+
+function shortMeaning(english: string, n = 2) {
+  return english.split(';').slice(0, n).join(';').trim();
+}
 import type { ChainEntry, GameMode, GameOverReason, VsSubmode, ComputerLevel } from '@/hooks/useGameState';
 import type { MoveResult, ConnectionType } from '@/lib/gameRules';
 import { calcSpeedMultiplier } from '@/lib/gameRules';
@@ -69,7 +73,7 @@ function ChainEntryRow({ entry, mode, isLast }: { entry: ChainEntry; mode: GameM
           <HskBadge level={entry.word.hskLevel} />
         </div>
         <span className="text-slate-400 text-xs">{entry.word.pinyin}</span>
-        <span className="text-slate-500 text-xs truncate max-w-xs">{entry.word.english}</span>
+        <span className="text-slate-500 text-xs truncate max-w-xs">{shortMeaning(entry.word.english)}</span>
         {entry.connectionType && (
           <span className={`text-xs mt-0.5 ${CONNECTION_COLORS[entry.connectionType as ConnectionType]}`}>
             {CONNECTION_LABELS[entry.connectionType as ConnectionType]}
@@ -394,7 +398,7 @@ export default function GameBoard({
                 </span>
                 <span className="text-slate-400 text-xs font-mono leading-tight shrink-0">{currentWord.word.pinyin}</span>
                 <span className="text-white text-lg leading-snug font-semibold">
-                  {currentWord.word.english}
+                  {shortMeaning(currentWord.word.english)}
                 </span>
               </div>
               {/* Chain target */}
