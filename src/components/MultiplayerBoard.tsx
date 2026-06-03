@@ -4,6 +4,21 @@ import { useState, useRef, useEffect, KeyboardEvent } from 'react';
 import type { RoomState, ChainEntry, PlayerInfo } from '@/hooks/useMultiplayerGame';
 import { getInitialFamilyDisplay, getCompatibleFinals } from '@/lib/pinyin';
 
+// 10 distinct colours cycling for players
+const PLAYER_COLORS = [
+  'text-sky-400', 'text-amber-400', 'text-emerald-400', 'text-rose-400',
+  'text-violet-400', 'text-orange-400', 'text-teal-400', 'text-pink-400',
+  'text-lime-400', 'text-cyan-400',
+];
+const PLAYER_BG = [
+  'bg-sky-900/60', 'bg-amber-900/60', 'bg-emerald-900/60', 'bg-rose-900/60',
+  'bg-violet-900/60', 'bg-orange-900/60', 'bg-teal-900/60', 'bg-pink-900/60',
+  'bg-lime-900/60', 'bg-cyan-900/60',
+];
+
+function playerColor(index: number) { return PLAYER_COLORS[index % PLAYER_COLORS.length]; }
+function playerBg(index: number) { return PLAYER_BG[index % PLAYER_BG.length]; }
+
 const CONNECTION_LABELS: Record<string, string> = {
   exactChar: 'Exact character +10',
   exactInitialExactFinal: 'Same sound +8',
@@ -12,14 +27,10 @@ const CONNECTION_LABELS: Record<string, string> = {
   familyInitialStrongFinal: 'Related sound +3',
   weakMusicalFinal: 'Musical rhyme +2',
 };
-
 const CONNECTION_COLORS: Record<string, string> = {
-  exactChar: 'text-emerald-400',
-  exactInitialExactFinal: 'text-sky-400',
-  familyInitialExactFinal: 'text-sky-300',
-  exactInitialStrongFinal: 'text-violet-400',
-  familyInitialStrongFinal: 'text-violet-300',
-  weakMusicalFinal: 'text-amber-400',
+  exactChar: 'text-emerald-400', exactInitialExactFinal: 'text-sky-400',
+  familyInitialExactFinal: 'text-sky-300', exactInitialStrongFinal: 'text-violet-400',
+  familyInitialStrongFinal: 'text-violet-300', weakMusicalFinal: 'text-amber-400',
 };
 
 function TimerBar({ timeRemaining }: { timeRemaining: number }) {
@@ -32,16 +43,33 @@ function TimerBar({ timeRemaining }: { timeRemaining: number }) {
   );
 }
 
+function SpeedMultiplierBadge({ timeRemaining }: { timeRemaining: number }) {
+  const mult = Math.round((1 + timeRemaining / 30) * 10) / 10;
+  const color = mult >= 1.8 ? 'text-emerald-300 bg-emerald-900/60' :
+                mult >= 1.4 ? 'text-amber-300 bg-amber-900/60' : 'text-slate-400 bg-slate-800';
+  return (
+    <span className={`text-xs font-bold px-2 py-0.5 rounded font-mono ${color}`}>
+      {mult.toFixed(1)}×
+    </span>
+  );
+}
+
 function ChainRow({ entry, players, isLast }: { entry: ChainEntry; players: PlayerInfo[]; isLast: boolean }) {
   const player = players.find(p => p.index === entry.playerIndex);
-  const colorClass = entry.playerIndex === 0 ? 'text-sky-400' : 'text-amber-400';
   return (
     <div className={`flex items-start gap-3 py-3 ${isLast ? 'opacity-100' : 'opacity-60'}`}>
       <div className="flex flex-col items-end min-w-[2.5rem]">
         {entry.playedBy === 'start'
           ? <span className="text-slate-500 text-xs">Start</span>
-          : <span className={`text-xs ${colorClass}`}>{player?.name ?? '?'}</span>}
-        {entry.score > 0 && <span className="text-slate-400 text-xs">+{entry.score}</span>}
+          : <span className={`text-xs font-medium ${playerColor(entry.playerIndex)}`}>{player?.name ?? '?'}</span>}
+        {entry.score > 0 && (
+          <span className="text-slate-400 text-xs">
+            +{entry.score}
+            {entry.speedMultiplier > 1 && (
+              <span className="text-emerald-500 ml-0.5">{entry.speedMultiplier.toFixed(1)}×</span>
+            )}
+          </span>
+        )}
       </div>
       <div className="flex flex-col">
         <span className="text-2xl font-bold text-white tracking-wider">{entry.word.simplified}</span>
@@ -60,15 +88,19 @@ function ChainRow({ entry, players, isLast }: { entry: ChainEntry; players: Play
 
 interface Props {
   roomState: RoomState;
-  myIndex: 0 | 1 | null;
+  myIndex: number | null;
   isMyTurn: boolean;
+  isHost: boolean;
   serverError: string | null;
   roomId: string;
   onSubmit: (word: string) => void;
+  onStart: () => void;
   onLeave: () => void;
 }
 
-export default function MultiplayerBoard({ roomState, myIndex, isMyTurn, serverError, roomId, onSubmit, onLeave }: Props) {
+export default function MultiplayerBoard({
+  roomState, myIndex, isMyTurn, isHost, serverError, roomId, onSubmit, onStart, onLeave,
+}: Props) {
   const [input, setInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const chainEndRef = useRef<HTMLDivElement>(null);
@@ -81,40 +113,69 @@ export default function MultiplayerBoard({ roomState, myIndex, isMyTurn, serverE
     onSubmit(input.trim());
     setInput('');
   }
-
   function handleKey(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') handleSubmit();
   }
 
-  const { players, chain, currentPlayerIndex, timeRemaining, status, gameOverReason, lastMoveError } = roomState;
-  const p0 = players[0];
-  const p1 = players[1];
-  const currentWord = chain[chain.length - 1];
+  const { players, chain, currentPlayerIndex, timeRemaining, status, gameOverReason, lastMoveError, hostId } = roomState;
   const currentTurnPlayer = players.find(p => p.index === currentPlayerIndex);
+  const currentWord = chain[chain.length - 1];
 
-  // ── Waiting ────────────────────────────────────────────────────────────────
+  // ── Waiting / Lobby ───────────────────────────────────────────────────────
   if (status === 'waiting') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-4">
-        <div className="text-3xl font-bold text-white">Waiting for opponent…</div>
-        <div className="bg-slate-800 rounded-2xl px-8 py-6 border border-slate-700">
-          <p className="text-slate-400 text-sm mb-2">Share this room code with your friend:</p>
-          <div className="text-4xl font-bold tracking-[0.3em] text-emerald-400">{roomId.toUpperCase()}</div>
+        <div className="text-2xl font-bold text-white">Room <span className="text-emerald-400 tracking-widest">{roomId.toUpperCase()}</span></div>
+
+        {/* Share code */}
+        <div className="bg-slate-800 rounded-2xl px-8 py-4 border border-slate-700 w-full max-w-sm">
+          <p className="text-slate-400 text-xs mb-1">Share this code with friends:</p>
+          <div className="text-4xl font-bold tracking-[0.3em] text-emerald-400 mb-3">{roomId.toUpperCase()}</div>
+          <p className="text-slate-500 text-xs">{players.length} / 10 players joined</p>
         </div>
-        <div className="flex items-center gap-2 text-slate-500 text-sm">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          {players[0] ? `${players[0].name} is ready` : 'Connecting…'}
+
+        {/* Player list */}
+        <div className="w-full max-w-sm flex flex-col gap-2">
+          {players.map((p) => (
+            <div key={p.id} className={`flex items-center gap-3 px-4 py-2 rounded-xl ${playerBg(p.index)}`}>
+              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${playerColor(p.index)}`}>
+                {p.index + 1}
+              </span>
+              <span className={`font-medium ${playerColor(p.index)}`}>{p.name}</span>
+              {p.id === hostId && <span className="text-xs text-slate-500 ml-auto">host</span>}
+              {p.index === myIndex && <span className="text-xs text-emerald-500 ml-auto">you</span>}
+            </div>
+          ))}
+          {players.length < 2 && (
+            <div className="flex items-center gap-2 text-slate-500 text-sm justify-center py-2">
+              <span className="w-2 h-2 rounded-full bg-slate-500 animate-pulse" />
+              Waiting for more players…
+            </div>
+          )}
         </div>
+
+        {/* Start button (host only) */}
+        {isHost ? (
+          <button
+            onClick={onStart}
+            disabled={players.length < 2}
+            className="px-8 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-colors"
+          >
+            {players.length < 2 ? 'Need at least 2 players' : `Start Game (${players.length} players)`}
+          </button>
+        ) : (
+          <p className="text-slate-400 text-sm">Waiting for host to start…</p>
+        )}
+
         <button onClick={onLeave} className="text-slate-500 hover:text-white text-sm transition-colors">← Leave room</button>
       </div>
     );
   }
 
-  // ── Game Over ──────────────────────────────────────────────────────────────
+  // ── Game Over ─────────────────────────────────────────────────────────────
   if (status === 'game-over') {
-    const winner = p0 && p1
-      ? p0.score > p1.score ? p0 : p1.score > p0.score ? p1 : null
-      : null;
+    const sorted = [...players].sort((a, b) => b.score - a.score);
+    const winner = sorted[0]?.score > (sorted[1]?.score ?? 0) ? sorted[0] : null;
 
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-4">
@@ -122,26 +183,28 @@ export default function MultiplayerBoard({ roomState, myIndex, isMyTurn, serverE
         <p className="text-slate-400">
           {gameOverReason === 'timeout' ? 'Time ran out!' : gameOverReason ?? 'Game ended'}
         </p>
-        {winner
-          ? <div className={`text-xl font-semibold ${winner.index === 0 ? 'text-sky-400' : 'text-amber-400'}`}>
-              {winner.index === myIndex ? 'You win! 🎉' : `${winner.name} wins!`}
+
+        {winner ? (
+          <div className={`text-xl font-semibold ${playerColor(winner.index)}`}>
+            {winner.index === myIndex ? 'You win! 🎉' : `${winner.name} wins!`}
+          </div>
+        ) : (
+          <div className="text-slate-300 text-xl">It&apos;s a draw!</div>
+        )}
+
+        {/* Final leaderboard */}
+        <div className="w-full max-w-sm flex flex-col gap-2">
+          {sorted.map((p, rank) => (
+            <div key={p.id} className={`flex items-center gap-3 px-4 py-3 rounded-xl ${playerBg(p.index)}`}>
+              <span className="text-slate-400 text-sm w-5 text-right">{rank + 1}</span>
+              <span className={`flex-1 font-medium text-left ${playerColor(p.index)}`}>
+                {p.name}{p.index === myIndex ? ' (you)' : ''}
+              </span>
+              <span className={`font-bold text-lg ${playerColor(p.index)}`}>{p.score}</span>
             </div>
-          : <div className="text-slate-300 text-xl">It&apos;s a draw!</div>
-        }
-        <div className="flex gap-8">
-          {p0 && (
-            <div className="text-center">
-              <div className="text-3xl font-bold text-sky-400">{p0.score}</div>
-              <div className="text-slate-400 text-sm">{p0.name}</div>
-            </div>
-          )}
-          {p1 && (
-            <div className="text-center">
-              <div className="text-3xl font-bold text-amber-400">{p1.score}</div>
-              <div className="text-slate-400 text-sm">{p1.name}</div>
-            </div>
-          )}
+          ))}
         </div>
+
         <div className="text-slate-500 text-sm">Chain length: {chain.length} words</div>
         <button onClick={onLeave} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-semibold transition-colors">
           Back to Menu
@@ -150,31 +213,35 @@ export default function MultiplayerBoard({ roomState, myIndex, isMyTurn, serverE
     );
   }
 
-  // ── Playing ────────────────────────────────────────────────────────────────
+  // ── Playing ───────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full max-w-2xl mx-auto w-full">
-      {/* Header */}
+      {/* Scoreboard */}
       <div className="flex-none px-4 pt-3 pb-3 border-b border-slate-700">
-        <div className="flex justify-between items-center mb-2">
-          {/* Player 0 */}
-          <div className={`text-center transition-opacity ${currentPlayerIndex === 0 ? 'opacity-100' : 'opacity-40'}`}>
-            <div className="text-xl font-bold text-sky-400">{p0?.score ?? 0}</div>
-            <div className="text-slate-400 text-xs">{p0?.name ?? '…'}</div>
-            {myIndex === 0 && <div className="text-emerald-500 text-xs">you</div>}
-          </div>
-
-          {/* Center turn indicator */}
-          <div className="flex flex-col items-center gap-1">
-            <div className="text-slate-300 text-sm font-medium">
-              {isMyTurn ? 'Your turn' : `${currentTurnPlayer?.name ?? '…'}'s turn`}
+        {/* Player score row */}
+        <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+          {players.map(p => (
+            <div
+              key={p.id}
+              className={`flex-none text-center px-3 py-1.5 rounded-lg transition-opacity ${
+                p.index === currentPlayerIndex ? 'opacity-100 ring-1 ring-current' : 'opacity-50'
+              } ${playerColor(p.index)}`}
+            >
+              <div className="text-base font-bold leading-none">{p.score}</div>
+              <div className="text-xs opacity-80 mt-0.5 max-w-[4rem] truncate">{p.name}</div>
+              {p.index === myIndex && <div className="text-xs opacity-60">you</div>}
             </div>
-          </div>
+          ))}
+        </div>
 
-          {/* Player 1 */}
-          <div className={`text-center transition-opacity ${currentPlayerIndex === 1 ? 'opacity-100' : 'opacity-40'}`}>
-            <div className="text-xl font-bold text-amber-400">{p1?.score ?? 0}</div>
-            <div className="text-slate-400 text-xs">{p1?.name ?? '…'}</div>
-            {myIndex === 1 && <div className="text-emerald-500 text-xs">you</div>}
+        {/* Turn + multiplier */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-slate-300 text-sm font-medium">
+            {isMyTurn ? 'Your turn' : `${currentTurnPlayer?.name ?? '…'}'s turn`}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-slate-500 text-xs">Speed bonus</span>
+            <SpeedMultiplierBadge timeRemaining={timeRemaining} />
           </div>
         </div>
 
@@ -216,9 +283,7 @@ export default function MultiplayerBoard({ roomState, myIndex, isMyTurn, serverE
                     <span key={m} className={`px-1.5 py-0.5 rounded text-xs font-mono ${m === initial ? 'bg-emerald-700 text-emerald-200' : 'bg-slate-700 text-slate-300'}`}>{m}</span>
                   ))}
                 </>
-              ) : (
-                <span className="text-slate-500 text-xs">vowel-start only</span>
-              )}
+              ) : <span className="text-slate-500 text-xs">vowel-start only</span>}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-slate-500 text-xs w-16 shrink-0">Finals:</span>
@@ -241,7 +306,7 @@ export default function MultiplayerBoard({ roomState, myIndex, isMyTurn, serverE
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKey}
-            placeholder={isMyTurn ? 'Type a Chinese word…' : 'Waiting for opponent…'}
+            placeholder={isMyTurn ? 'Type a Chinese word…' : `Waiting for ${currentTurnPlayer?.name ?? '…'}…`}
             disabled={!isMyTurn}
             className="flex-1 bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-white text-lg placeholder-slate-600 focus:outline-none focus:border-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
           />

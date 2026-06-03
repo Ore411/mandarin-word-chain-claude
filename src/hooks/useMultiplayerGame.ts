@@ -3,8 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import usePartySocket from 'partysocket/react';
 
-// ── Shared types (mirrored from party/src/game.ts) ────────────────────────────
-
 export interface Syllable {
   initial: string;
   final: string;
@@ -27,14 +25,15 @@ export interface WordEntry {
 export interface ChainEntry {
   word: WordEntry;
   playedBy: string;
-  playerIndex: 0 | 1;
+  playerIndex: number;
   score: number;
   connectionType: string;
+  speedMultiplier: number;
 }
 
 export interface PlayerInfo {
   id: string;
-  index: 0 | 1;
+  index: number;
   name: string;
   score: number;
 }
@@ -43,9 +42,10 @@ export type RoomStatus = 'waiting' | 'playing' | 'game-over';
 
 export interface RoomState {
   status: RoomStatus;
+  hostId: string | null;
   players: PlayerInfo[];
   chain: ChainEntry[];
-  currentPlayerIndex: 0 | 1;
+  currentPlayerIndex: number;
   timeRemaining: number;
   gameOverReason: string | null;
   lastMoveError: string | null;
@@ -54,8 +54,6 @@ export interface RoomState {
 type ServerMsg =
   | { type: 'state'; state: RoomState }
   | { type: 'error'; message: string };
-
-// ── Hook ──────────────────────────────────────────────────────────────────────
 
 const PARTYKIT_HOST = process.env.NEXT_PUBLIC_PARTYKIT_HOST ?? 'mandarin-word-chain.ore411.partykit.dev';
 
@@ -68,9 +66,6 @@ export function useMultiplayerGame(roomId: string, playerName: string) {
   const ws = usePartySocket({
     host: PARTYKIT_HOST,
     room: roomId,
-    onOpen() {
-      // Send join after socket opens — socket id is available via ws.id
-    },
     onMessage(e: MessageEvent) {
       const msg = JSON.parse(e.data as string) as ServerMsg;
       if (msg.type === 'state') {
@@ -82,7 +77,6 @@ export function useMultiplayerGame(roomId: string, playerName: string) {
     },
   });
 
-  // Capture socket id and send join once
   useEffect(() => {
     if (!ws || joined) return;
     const id = (ws as unknown as { id: string }).id;
@@ -96,8 +90,13 @@ export function useMultiplayerGame(roomId: string, playerName: string) {
     ws?.send(JSON.stringify({ type: 'play', word }));
   }, [ws]);
 
-  const myIndex: 0 | 1 | null = roomState?.players.find(p => p.id === myId)?.index ?? null;
-  const isMyTurn = myIndex !== null && roomState?.currentPlayerIndex === myIndex;
+  const startGame = useCallback(() => {
+    ws?.send(JSON.stringify({ type: 'start' }));
+  }, [ws]);
 
-  return { roomState, myId, myIndex, isMyTurn, serverError, submitWord };
+  const myIndex: number | null = roomState?.players.find(p => p.id === myId)?.index ?? null;
+  const isMyTurn = myIndex !== null && roomState?.currentPlayerIndex === myIndex;
+  const isHost = myId !== null && roomState?.hostId === myId;
+
+  return { roomState, myId, myIndex, isMyTurn, isHost, serverError, submitWord, startGame };
 }

@@ -24,61 +24,53 @@ interface WordEntry {
 interface ChainEntry {
   word: WordEntry;
   playedBy: string; // connection id or 'start'
-  playerIndex: 0 | 1;
+  playerIndex: number;
   score: number;
   connectionType: string;
+  speedMultiplier: number;
 }
 
 type RoomStatus = 'waiting' | 'playing' | 'game-over';
 
-interface PlayerInfo {
+export interface PlayerInfo {
   id: string;
-  index: 0 | 1;
+  index: number;
   name: string;
   score: number;
 }
 
-interface RoomState {
+export interface RoomState {
   status: RoomStatus;
+  hostId: string | null;
   players: PlayerInfo[];
   chain: ChainEntry[];
-  currentPlayerIndex: 0 | 1;
+  currentPlayerIndex: number;
   timeRemaining: number;
   gameOverReason: string | null;
   lastMoveError: string | null;
 }
 
-// ── Outbound message types (server → clients) ────────────────────────────────
+// ── Message types ────────────────────────────────────────────────────────────
 
 type ServerMsg =
   | { type: 'state'; state: RoomState }
   | { type: 'error'; message: string };
 
-// ── Inbound message types (client → server) ──────────────────────────────────
-
 type ClientMsg =
   | { type: 'join'; name: string }
+  | { type: 'start' }
   | { type: 'play'; word: string };
 
-// ── Game logic (inline — party runs in edge runtime, can't import from src/) ──
+// ── Game logic ───────────────────────────────────────────────────────────────
 
 type ConnectionType =
-  | 'exactChar'
-  | 'exactInitialExactFinal'
-  | 'familyInitialExactFinal'
-  | 'exactInitialStrongFinal'
-  | 'familyInitialStrongFinal'
-  | 'weakMusicalFinal'
+  | 'exactChar' | 'exactInitialExactFinal' | 'familyInitialExactFinal'
+  | 'exactInitialStrongFinal' | 'familyInitialStrongFinal' | 'weakMusicalFinal'
   | 'invalid';
 
 const BASE_SCORES: Record<ConnectionType, number> = {
-  exactChar: 10,
-  exactInitialExactFinal: 8,
-  familyInitialExactFinal: 6,
-  exactInitialStrongFinal: 5,
-  familyInitialStrongFinal: 3,
-  weakMusicalFinal: 2,
-  invalid: 0,
+  exactChar: 10, exactInitialExactFinal: 8, familyInitialExactFinal: 6,
+  exactInitialStrongFinal: 5, familyInitialStrongFinal: 3, weakMusicalFinal: 2, invalid: 0,
 };
 
 const INITIAL_FAMILIES: Record<string, string> = {
@@ -95,7 +87,6 @@ const STRONG_SIMILAR_SET = new Set<string>([
   'an|ang', 'ang|an', 'en|eng', 'eng|en', 'in|ing', 'ing|in',
   'ian|iang', 'iang|ian', 'uan|uang', 'uang|uan',
 ]);
-
 const WEAK_MUSICAL_SET = new Set<string>(['ui|ei', 'ei|ui']);
 
 function initialsCompatible(a: string, b: string): boolean {
@@ -127,57 +118,49 @@ function classifyConnection(prev: WordEntry, next: WordEntry): ConnectionType {
 }
 
 function lengthBonus(n: number): number {
-  if (n === 2) return 0;
-  if (n === 3) return 2;
-  if (n === 4) return 4;
-  return 6;
+  if (n === 2) return 0; if (n === 3) return 2; if (n === 4) return 4; return 6;
 }
 
-// ── Pinyin parser (minimal, matches src/lib/pinyin.ts logic) ─────────────────
+function speedMultiplier(timeRemaining: number): number {
+  // 2.0x at full time (30s), 1.0x at timeout (0s)
+  return Math.round((1 + timeRemaining / 30) * 10) / 10;
+}
+
+// ── Pinyin parser ────────────────────────────────────────────────────────────
 
 const INITIALS = ['zh', 'ch', 'sh', 'b', 'p', 'm', 'f', 'd', 't', 'n', 'l',
   'g', 'k', 'h', 'j', 'q', 'x', 'r', 'z', 'c', 's', 'y', 'w'];
 
 function parseSyllable(raw: string): Syllable {
-  const cleaned = raw.replace(/[āáǎàāáǎà]/g, 'a')
-    .replace(/[ēéěè]/g, 'e')
-    .replace(/[īíǐì]/g, 'i')
-    .replace(/[ōóǒò]/g, 'o')
-    .replace(/[ūúǔù]/g, 'u')
-    .replace(/[ǖǘǚǜü]/g, 'v')
-    .replace(/[1-5]$/, '');
-
-  let tone: number | null = null;
   const toneMap: Record<string, number> = {
-    'ā': 1, 'á': 2, 'ǎ': 3, 'à': 4,
-    'ē': 1, 'é': 2, 'ě': 3, 'è': 4,
-    'ī': 1, 'í': 2, 'ǐ': 3, 'ì': 4,
-    'ō': 1, 'ó': 2, 'ǒ': 3, 'ò': 4,
+    'ā': 1, 'á': 2, 'ǎ': 3, 'à': 4, 'ē': 1, 'é': 2, 'ě': 3, 'è': 4,
+    'ī': 1, 'í': 2, 'ǐ': 3, 'ì': 4, 'ō': 1, 'ó': 2, 'ǒ': 3, 'ò': 4,
     'ū': 1, 'ú': 2, 'ǔ': 3, 'ù': 4,
   };
-  for (const ch of raw) {
-    if (toneMap[ch]) { tone = toneMap[ch]; break; }
-  }
+  let tone: number | null = null;
+  for (const ch of raw) { if (toneMap[ch]) { tone = toneMap[ch]; break; } }
   const toneDigit = raw.match(/([1-5])$/)?.[1];
   if (!tone && toneDigit) tone = parseInt(toneDigit);
+
+  const cleaned = raw
+    .replace(/[āáǎà]/g, 'a').replace(/[ēéěè]/g, 'e').replace(/[īíǐì]/g, 'i')
+    .replace(/[ōóǒò]/g, 'o').replace(/[ūúǔù]/g, 'u').replace(/[ǖǘǚǜü]/g, 'v')
+    .replace(/[1-5]$/, '');
 
   let initial = '';
   let remaining = cleaned;
   for (const ini of INITIALS) {
     if (cleaned.startsWith(ini)) { initial = ini; remaining = cleaned.slice(ini.length); break; }
   }
-
   return { initial, final: remaining, tone };
 }
 
-// ── Dictionary fetching ───────────────────────────────────────────────────────
+// ── Dictionary ───────────────────────────────────────────────────────────────
 
 let cachedDict: WordEntry[] | null = null;
 
 async function getDictionary(): Promise<WordEntry[]> {
   if (cachedDict) return cachedDict;
-  // Fetch the pre-built dictionary from the deployed Next.js app
-  // We use the public URL set via env var, falling back to production URL
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://mandarin-word-chain-claude.vercel.app';
   const res = await fetch(`${baseUrl}/api/dictionary`);
   if (!res.ok) throw new Error('Failed to load dictionary');
@@ -197,12 +180,14 @@ function pickStartingWord(dict: WordEntry[]): WordEntry {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const TURN_SECONDS = 30;
+const MAX_PLAYERS = 10;
 
 // ── Party Server ──────────────────────────────────────────────────────────────
 
 export default class GameRoom implements Party.Server {
   private state: RoomState = {
     status: 'waiting',
+    hostId: null,
     players: [],
     chain: [],
     currentPlayerIndex: 0,
@@ -218,12 +203,7 @@ export default class GameRoom implements Party.Server {
   constructor(readonly room: Party.Room) {}
 
   async onStart() {
-    try {
-      this.dict = await getDictionary();
-    } catch (e) {
-      console.error('Failed to load dictionary on start:', e);
-    }
-    // Restore state from storage if room already existed
+    try { this.dict = await getDictionary(); } catch (e) { console.error('Dict load failed:', e); }
     const saved = await this.room.storage.get<RoomState>('state');
     if (saved) this.state = saved;
     const savedUsed = await this.room.storage.get<string[]>('usedWords');
@@ -231,40 +211,39 @@ export default class GameRoom implements Party.Server {
   }
 
   async onConnect(conn: Party.Connection) {
-    // Send current state to the new connection
     conn.send(JSON.stringify({ type: 'state', state: this.state } satisfies ServerMsg));
   }
 
   async onMessage(raw: string, sender: Party.Connection) {
     if (!this.dict.length) {
-      try { this.dict = await getDictionary(); } catch { /* will retry next message */ }
+      try { this.dict = await getDictionary(); } catch { /* retry next message */ }
     }
-
     let msg: ClientMsg;
     try { msg = JSON.parse(raw) as ClientMsg; } catch { return; }
 
-    if (msg.type === 'join') {
-      await this.handleJoin(sender, msg.name);
-    } else if (msg.type === 'play') {
-      await this.handlePlay(sender, msg.word);
-    }
+    if (msg.type === 'join') await this.handleJoin(sender, msg.name);
+    else if (msg.type === 'start') await this.handleStart(sender);
+    else if (msg.type === 'play') await this.handlePlay(sender, msg.word);
   }
 
   async onClose(conn: Party.Connection) {
-    // If a player disconnects during a game, end it
+    const player = this.state.players.find(p => p.id === conn.id);
+    if (!player) return;
+
     if (this.state.status === 'playing') {
-      const player = this.state.players.find(p => p.id === conn.id);
-      if (player) {
-        this.stopTimer();
-        this.state.status = 'game-over';
-        this.state.gameOverReason = `${player.name} disconnected`;
-        this.broadcast();
-        await this.saveState();
-      }
-    }
-    // If waiting and a player leaves, remove them
-    if (this.state.status === 'waiting') {
+      this.stopTimer();
+      this.state.status = 'game-over';
+      this.state.gameOverReason = `${player.name} disconnected`;
+      this.broadcast();
+      await this.saveState();
+    } else if (this.state.status === 'waiting') {
       this.state.players = this.state.players.filter(p => p.id !== conn.id);
+      // Re-index remaining players
+      this.state.players.forEach((p, i) => { p.index = i; });
+      // If host left, assign new host
+      if (this.state.hostId === conn.id) {
+        this.state.hostId = this.state.players[0]?.id ?? null;
+      }
       this.broadcast();
       await this.saveState();
     }
@@ -277,24 +256,33 @@ export default class GameRoom implements Party.Server {
       conn.send(JSON.stringify({ type: 'error', message: 'Game already in progress' } satisfies ServerMsg));
       return;
     }
-    if (this.state.players.length >= 2) {
-      conn.send(JSON.stringify({ type: 'error', message: 'Room is full' } satisfies ServerMsg));
+    if (this.state.players.length >= MAX_PLAYERS) {
+      conn.send(JSON.stringify({ type: 'error', message: 'Room is full (max 10 players)' } satisfies ServerMsg));
       return;
     }
-    if (this.state.players.find(p => p.id === conn.id)) {
-      // Already joined — ignore
+    if (this.state.players.find(p => p.id === conn.id)) return; // already joined
+
+    const index = this.state.players.length;
+    const trimmedName = name.trim() || `Player ${index + 1}`;
+    this.state.players.push({ id: conn.id, index, name: trimmedName, score: 0 });
+
+    if (!this.state.hostId) this.state.hostId = conn.id;
+
+    this.broadcast();
+    await this.saveState();
+  }
+
+  private async handleStart(conn: Party.Connection) {
+    if (this.state.status !== 'waiting') return;
+    if (this.state.hostId !== conn.id) {
+      conn.send(JSON.stringify({ type: 'error', message: 'Only the host can start the game' } satisfies ServerMsg));
       return;
     }
-
-    const index = this.state.players.length as 0 | 1;
-    this.state.players.push({ id: conn.id, index, name: name.trim() || `Player ${index + 1}`, score: 0 });
-
-    if (this.state.players.length === 2) {
-      await this.startGame();
-    } else {
-      this.broadcast();
-      await this.saveState();
+    if (this.state.players.length < 2) {
+      conn.send(JSON.stringify({ type: 'error', message: 'Need at least 2 players to start' } satisfies ServerMsg));
+      return;
     }
+    await this.startGame();
   }
 
   private async handlePlay(conn: Party.Connection, simplified: string) {
@@ -313,7 +301,6 @@ export default class GameRoom implements Party.Server {
       this.broadcast();
       return;
     }
-
     if (this.usedWords.has(simplified)) {
       this.state.lastMoveError = 'Word already used';
       this.broadcast();
@@ -328,27 +315,25 @@ export default class GameRoom implements Party.Server {
       return;
     }
 
-    // Valid move
     this.stopTimer();
     this.state.lastMoveError = null;
 
     const base = BASE_SCORES[connType];
     const lb = lengthBonus(entry.wordLength);
     const cb = entry.isChengyu ? 5 : 0;
-    const score = base + lb + cb;
+    const mult = speedMultiplier(this.state.timeRemaining);
+    const score = Math.round((base + lb + cb) * mult);
 
     this.state.chain.push({
-      word: entry,
-      playedBy: conn.id,
-      playerIndex: player.index,
-      score,
-      connectionType: connType,
+      word: entry, playedBy: conn.id, playerIndex: player.index,
+      score, connectionType: connType, speedMultiplier: mult,
     });
     this.usedWords.add(simplified);
     this.state.players[player.index].score += score;
 
-    // Switch turns
-    this.state.currentPlayerIndex = player.index === 0 ? 1 : 0;
+    // Advance to next player (round-robin)
+    this.state.currentPlayerIndex = (player.index + 1) % this.state.players.length;
+
     this.broadcast();
     await this.saveState();
     this.startTimer();
@@ -361,13 +346,15 @@ export default class GameRoom implements Party.Server {
     this.usedWords = new Set([startWord.simplified]);
 
     this.state.status = 'playing';
-    this.state.chain = [{ word: startWord, playedBy: 'start', playerIndex: 0, score: 0, connectionType: '' }];
+    this.state.chain = [{
+      word: startWord, playedBy: 'start', playerIndex: 0,
+      score: 0, connectionType: '', speedMultiplier: 1,
+    }];
     this.state.currentPlayerIndex = 0;
     this.state.timeRemaining = TURN_SECONDS;
     this.state.gameOverReason = null;
     this.state.lastMoveError = null;
-    this.state.players[0].score = 0;
-    this.state.players[1].score = 0;
+    this.state.players.forEach(p => { p.score = 0; });
 
     this.broadcast();
     await this.saveState();
@@ -391,17 +378,11 @@ export default class GameRoom implements Party.Server {
   }
 
   private stopTimer() {
-    if (this.timerInterval) {
-      clearInterval(this.timerInterval);
-      this.timerInterval = null;
-    }
+    if (this.timerInterval) { clearInterval(this.timerInterval); this.timerInterval = null; }
   }
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
   private broadcast() {
-    const msg: ServerMsg = { type: 'state', state: this.state };
-    this.room.broadcast(JSON.stringify(msg));
+    this.room.broadcast(JSON.stringify({ type: 'state', state: this.state } satisfies ServerMsg));
   }
 
   private async saveState() {
