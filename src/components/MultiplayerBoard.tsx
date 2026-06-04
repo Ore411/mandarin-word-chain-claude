@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useRef, useEffect, KeyboardEvent } from 'react';
+import type { RoomState, ChainEntry, PlayerInfo } from '@/hooks/useMultiplayerGame';
+import { getInitialFamilyDisplay, getCompatibleFinals } from '@/lib/pinyin';
+import VocabReview from '@/components/VocabReview';
 
 function shortMeaning(english: string, n = 2) {
   return english.split(';').slice(0, n).join(';').trim();
 }
-import type { RoomState, ChainEntry, PlayerInfo } from '@/hooks/useMultiplayerGame';
-import { getInitialFamilyDisplay, getCompatibleFinals } from '@/lib/pinyin';
 
 // 10 distinct colours cycling for players
 const PLAYER_COLORS = [
@@ -299,7 +300,7 @@ export default function MultiplayerBoard({
     const winner = sorted[0]?.score > (sorted[1]?.score ?? 0) ? sorted[0] : null;
 
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-4">
+      <div className="flex flex-col items-center gap-6 text-center px-4 py-8 overflow-y-auto">
         <h2 className="text-4xl font-bold text-white">Game Over</h2>
         <p className="text-slate-400">
           {gameOverReason === 'timeout' ? 'Time ran out!' : gameOverReason ?? 'Game ended'}
@@ -348,7 +349,6 @@ export default function MultiplayerBoard({
           })}
         </div>
 
-        <div className="text-slate-500 text-sm">Chain length: {chain.length} words</div>
         <div className="flex gap-3">
           {isHost ? (
             <button onClick={onRematch} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-semibold transition-colors">
@@ -361,6 +361,8 @@ export default function MultiplayerBoard({
             Leave
           </button>
         </div>
+
+        <VocabReview chain={chain} />
       </div>
     );
   }

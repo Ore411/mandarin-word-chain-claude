@@ -1,3 +1,43 @@
+// ── Tone mark conversion ──────────────────────────────────────────────────────
+// Converts numbered pinyin "gong1 zuo4" → tone-marked "gōng zuò"
+
+const TONE_MARKS: Record<string, string[]> = {
+  a: ['ā','á','ǎ','à','a'],
+  e: ['ē','é','ě','è','e'],
+  i: ['ī','í','ǐ','ì','i'],
+  o: ['ō','ó','ǒ','ò','o'],
+  u: ['ū','ú','ǔ','ù','u'],
+  ü: ['ǖ','ǘ','ǚ','ǜ','ü'],
+};
+
+// Tone placement rules: a/e always take the mark; ou → o; otherwise last vowel
+function applyTone(syllable: string, tone: number): string {
+  if (tone === 5 || tone === 0) return syllable; // neutral tone — no mark
+  const t = tone - 1;
+  // ü written as v or u: after j/q/x/y, u is actually ü
+  const s = syllable.replace(/v/g, 'ü');
+  if (/a|e/.test(s)) return s.replace(/[ae]/, m => TONE_MARKS[m][t]);
+  if (s.includes('ou')) return s.replace('o', TONE_MARKS['o'][t]);
+  // find last vowel
+  const vowels = ['ü','a','e','i','o','u'];
+  for (let i = s.length - 1; i >= 0; i--) {
+    const c = s[i];
+    if (vowels.includes(c)) return s.slice(0, i) + TONE_MARKS[c][t] + s.slice(i + 1);
+  }
+  return s;
+}
+
+function convertSyllable(syl: string): string {
+  const match = syl.match(/^([a-züA-ZÜ]+)([1-5])$/);
+  if (!match) return syl;
+  return applyTone(match[1], parseInt(match[2]));
+}
+
+/** Convert numbered pinyin string to tone-marked. e.g. "gong1 zuo4" → "gōng zuò" */
+export function toToneMarks(pinyin: string): string {
+  return pinyin.split(' ').map(convertSyllable).join(' ');
+}
+
 export interface Syllable {
   initial: string;
   final: string;

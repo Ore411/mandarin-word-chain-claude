@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, KeyboardEvent } from 'react';
+import VocabReview from '@/components/VocabReview';
 
 function shortMeaning(english: string, n = 2) {
   return english.split(';').slice(0, n).join(';').trim();
@@ -232,7 +233,7 @@ export default function GameBoard({
     };
 
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-4">
+      <div className="flex flex-col items-center gap-6 text-center px-4 py-8 overflow-y-auto">
         <h2 className="text-4xl font-bold text-white">Game Over</h2>
         <div className="flex items-center gap-3">
           {vsSubmode && (
@@ -270,14 +271,14 @@ export default function GameBoard({
           )}
         </div>
 
-        <div className="text-slate-500 text-sm">Chain length: {chain.length} words</div>
-
         <button
           onClick={onReset}
           className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-semibold transition-colors"
         >
           Play Again
         </button>
+
+        <VocabReview chain={chain} />
       </div>
     );
   }
