@@ -44,6 +44,7 @@ export interface PlayerInfo {
 }
 
 export type RoomStatus = 'waiting' | 'playing' | 'game-over';
+export type ChainMode = 'learner' | 'advanced';
 
 export interface RoomState {
   status: RoomStatus;
@@ -55,6 +56,7 @@ export interface RoomState {
   timeRemaining: number;
   targetScore: number | null;
   livesMode: number | null;
+  chainMode: ChainMode;
   gameOverReason: string | null;
   lastMoveError: string | null;
 }
@@ -116,8 +118,8 @@ export function useMultiplayerGame(roomId: string, playerName: string) {
     ws?.send(JSON.stringify({ type: 'play', word }));
   }, [ws]);
 
-  const startGame = useCallback((turnSeconds: 15 | 30 | 60, targetScore: number | null, livesMode: number | null) => {
-    ws?.send(JSON.stringify({ type: 'start', turnSeconds, targetScore, livesMode }));
+  const startGame = useCallback((turnSeconds: 15 | 30 | 60, targetScore: number | null, livesMode: number | null, chainMode: ChainMode = 'learner') => {
+    ws?.send(JSON.stringify({ type: 'start', turnSeconds, targetScore, livesMode, chainMode }));
   }, [ws]);
 
   const rematch = useCallback(() => {

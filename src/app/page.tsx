@@ -247,6 +247,7 @@ function VsComputer() {
   const [expanded, setExpanded] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
   const [selectedTime, setSelectedTime] = useState(30);
+  const [selectedChainMode, setSelectedChainMode] = useState<'learner' | 'advanced'>('learner');
 
   return (
     <div>
@@ -269,6 +270,26 @@ function VsComputer() {
         <div className="mt-2 ml-4 flex flex-col gap-3">
           <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-4 flex flex-col gap-4">
             <TimePicker value={selectedTime} onChange={setSelectedTime} />
+
+            {/* Chain mode */}
+            <div>
+              <p className="text-xs text-slate-400 uppercase tracking-wider mb-2">Chain mode</p>
+              <div className="flex gap-2">
+                {(['learner', 'advanced'] as const).map(m => (
+                  <button key={m} onClick={() => setSelectedChainMode(m)}
+                    className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      selectedChainMode === m ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                  >
+                    {m === 'learner' ? '🎓 Learner' : '⚡ Advanced'}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                {selectedChainMode === 'advanced' ? 'Exact character only — no phonetic matches' : 'Phonetic matches also accepted'}
+              </p>
+            </div>
+
             <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Computer vocabulary</p>
             <div className="flex flex-wrap gap-2">
               {COMPUTER_LEVELS.map(cl => (
@@ -290,7 +311,7 @@ function VsComputer() {
           {VS_SUBMODES.map(s => (
             <Link
               key={s.id}
-              href={`/game?mode=vs-computer&submode=${s.id}${selectedLevel != null ? `&level=${selectedLevel}` : ''}&time=${selectedTime}`}
+              href={`/game?mode=vs-computer&submode=${s.id}${selectedLevel != null ? `&level=${selectedLevel}` : ''}&time=${selectedTime}&chainMode=${selectedChainMode}`}
               className="group flex items-center gap-4 p-4 bg-slate-800/60 hover:bg-slate-700 border border-slate-700/60 hover:border-emerald-500 rounded-xl transition-all"
             >
               <span className="text-2xl">{s.emoji}</span>
@@ -336,6 +357,7 @@ function SoloMode() {
 function PassAndPlay() {
   const [expanded, setExpanded] = useState(false);
   const [selectedTime, setSelectedTime] = useState(30);
+  const [selectedChainMode, setSelectedChainMode] = useState<'learner' | 'advanced'>('learner');
   return (
     <div>
       <button
@@ -356,8 +378,25 @@ function PassAndPlay() {
         <div className="mt-2 ml-4">
           <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-4 flex flex-col gap-4">
             <TimePicker value={selectedTime} onChange={setSelectedTime} />
+
+            {/* Chain mode */}
+            <div>
+              <p className="text-xs text-slate-400 uppercase tracking-wider mb-2">Chain mode</p>
+              <div className="flex gap-2">
+                {(['learner', 'advanced'] as const).map(m => (
+                  <button key={m} onClick={() => setSelectedChainMode(m)}
+                    className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      selectedChainMode === m ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                  >
+                    {m === 'learner' ? '🎓 Learner' : '⚡ Advanced'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <Link
-              href={`/game?mode=pass-and-play&time=${selectedTime}`}
+              href={`/game?mode=pass-and-play&time=${selectedTime}&chainMode=${selectedChainMode}`}
               className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-semibold text-center transition-colors"
             >
               Start

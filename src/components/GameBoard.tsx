@@ -6,7 +6,7 @@ import VocabReview from '@/components/VocabReview';
 function shortMeaning(english: string, n = 2) {
   return english.split(';').slice(0, n).join(';').trim();
 }
-import type { ChainEntry, GameMode, GameOverReason, VsSubmode, ComputerLevel } from '@/hooks/useGameState';
+import type { ChainEntry, GameMode, GameOverReason, VsSubmode, ComputerLevel, ChainMode } from '@/hooks/useGameState';
 import type { MoveResult, ConnectionType } from '@/lib/gameRules';
 import { calcSpeedMultiplier } from '@/lib/gameRules';
 import { getInitialFamilyDisplay, getCompatibleFinals } from '@/lib/pinyin';
@@ -146,6 +146,7 @@ interface GameBoardProps {
   mode: GameMode;
   vsSubmode: VsSubmode | null;
   computerLevel: ComputerLevel;
+  chainMode?: ChainMode;
   status: string;
   lives: [number, number];
   playerTurnsLeft: number;
@@ -158,7 +159,7 @@ interface GameBoardProps {
 export default function GameBoard({
   chain, scores, currentPlayer, timeRemaining,
   isComputerThinking, gameOverReason, lastMoveResult,
-  mode, vsSubmode, computerLevel, status, lives, playerTurnsLeft, firstToXTarget, roundsTotal,
+  mode, vsSubmode, computerLevel, chainMode = 'learner', status, lives, playerTurnsLeft, firstToXTarget, roundsTotal,
   onSubmit, onReset,
 }: GameBoardProps) {
   const [input, setInput] = useState('');
@@ -312,6 +313,9 @@ export default function GameBoard({
                   {computerLevel != null && (
                     <span className="text-xs bg-violet-900 text-violet-300 px-1.5 py-0.5 rounded font-mono">HSK ≤{computerLevel}</span>
                   )}
+                  <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${chainMode === 'advanced' ? 'bg-amber-900 text-amber-300' : 'bg-slate-700 text-slate-400'}`}>
+                    {chainMode === 'advanced' ? '⚡ Advanced' : '🎓 Learner'}
+                  </span>
                 </div>
                 <div className={`text-slate-300 text-sm font-medium ${isComputerThinking ? 'animate-pulse text-rose-400' : ''}`}>
                   {isComputerThinking
@@ -339,7 +343,12 @@ export default function GameBoard({
             </>
           ) : (
             <>
-              <div className="text-slate-400 text-sm">Score</div>
+              <div className="flex flex-col items-start gap-1">
+                <div className="text-slate-400 text-sm">Score</div>
+                <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${chainMode === 'advanced' ? 'bg-amber-900 text-amber-300' : 'bg-slate-700 text-slate-400'}`}>
+                  {chainMode === 'advanced' ? '⚡ Advanced' : '🎓 Learner'}
+                </span>
+              </div>
               <div className="text-2xl font-bold text-emerald-400">{scores[0]}</div>
               <div className="text-slate-400 text-sm">Words: {chain.length}</div>
             </>
@@ -462,7 +471,11 @@ export default function GameBoard({
           </button>
         </div>
         {lastMoveResult && !lastMoveResult.valid && (
-          <div className="text-red-400 text-sm mt-1">✗ Word not found or invalid connection</div>
+          <div className="text-red-400 text-sm mt-1">
+            {lastMoveResult.connectionType === 'exactChar' && chainMode === 'advanced'
+              ? '✗ Advanced Mode only accepts exact character matches'
+              : '✗ Word not found or invalid connection'}
+          </div>
         )}
         {imeHint && (
           <div className="text-slate-600 text-xs mt-1.5">{imeHint}</div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, KeyboardEvent } from 'react';
-import type { RoomState, ChainEntry, PlayerInfo } from '@/hooks/useMultiplayerGame';
+import type { RoomState, ChainEntry, PlayerInfo, ChainMode } from '@/hooks/useMultiplayerGame';
 import { getInitialFamilyDisplay, getCompatibleFinals } from '@/lib/pinyin';
 import VocabReview from '@/components/VocabReview';
 
@@ -136,7 +136,7 @@ interface Props {
   serverError: string | null;
   roomId: string;
   onSubmit: (word: string) => void;
-  onStart: (turnSeconds: 15 | 30 | 60, targetScore: number | null, livesMode: number | null) => void;
+  onStart: (turnSeconds: 15 | 30 | 60, targetScore: number | null, livesMode: number | null, chainMode: ChainMode) => void;
   onRematch: () => void;
   onLeave: () => void;
 }
@@ -149,6 +149,7 @@ export default function MultiplayerBoard({
   const [gameMode, setGameMode] = useState<'endless' | 'first-to-x' | 'lives'>('endless');
   const [selectedTarget, setSelectedTarget] = useState<number>(100);
   const [selectedLives, setSelectedLives] = useState<number>(3);
+  const [selectedChainMode, setSelectedChainMode] = useState<ChainMode>('learner');
   const inputRef = useRef<HTMLInputElement>(null);
   const chainEndRef = useRef<HTMLDivElement>(null);
 
@@ -164,7 +165,7 @@ export default function MultiplayerBoard({
     if (e.key === 'Enter') handleSubmit();
   }
 
-  const { players, chain, currentPlayerIndex, turnSeconds, timeRemaining, targetScore, livesMode, status, gameOverReason, lastMoveError, hostId } = roomState;
+  const { players, chain, currentPlayerIndex, turnSeconds, timeRemaining, targetScore, livesMode, chainMode, status, gameOverReason, lastMoveError, hostId } = roomState;
   const currentTurnPlayer = players.find(p => p.index === currentPlayerIndex);
   const currentWord = chain[chain.length - 1];
 
@@ -257,6 +258,27 @@ export default function MultiplayerBoard({
               </div>
             )}
 
+            {/* Chain mode */}
+            <div className="w-full">
+              <p className="text-xs text-slate-400 uppercase tracking-wider mb-2 text-center">Chain mode</p>
+              <div className="flex gap-2">
+                {(['learner', 'advanced'] as const).map(m => (
+                  <button key={m} onClick={() => setSelectedChainMode(m)}
+                    className={`flex-1 py-2 rounded-xl font-semibold text-xs transition-colors ${
+                      selectedChainMode === m ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                  >
+                    {m === 'learner' ? '🎓 Learner' : '⚡ Advanced'}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-slate-500 mt-1.5 text-center">
+                {selectedChainMode === 'advanced'
+                  ? 'Advanced: exact character matches only'
+                  : 'Learner: similar sounds also count'}
+              </p>
+            </div>
+
             {/* Time per turn */}
             <div className="w-full">
               <p className="text-xs text-slate-400 uppercase tracking-wider mb-2 text-center">Time per turn</p>
@@ -278,6 +300,7 @@ export default function MultiplayerBoard({
                 selectedTime,
                 gameMode === 'first-to-x' ? selectedTarget : null,
                 gameMode === 'lives' ? selectedLives : null,
+                selectedChainMode,
               )}
               disabled={players.length < 2}
               className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-colors"
@@ -287,6 +310,12 @@ export default function MultiplayerBoard({
           </div>
         ) : (
           <p className="text-slate-400 text-sm">Waiting for host to start…</p>
+        )}
+        {/* Show current chain mode selection to non-hosts (read-only) */}
+        {!isHost && roomState.chainMode && (
+          <div className={`text-xs px-3 py-1.5 rounded-lg font-mono ${roomState.chainMode === 'advanced' ? 'bg-amber-900/60 text-amber-300' : 'bg-slate-800 text-slate-400'}`}>
+            {roomState.chainMode === 'advanced' ? '⚡ Advanced Mode' : '🎓 Learner Mode'}
+          </div>
         )}
 
         <button onClick={onLeave} className="text-slate-500 hover:text-white text-sm transition-colors">← Leave room</button>
@@ -418,6 +447,13 @@ export default function MultiplayerBoard({
             </div>
           </div>
         )}
+
+        {/* Chain mode badge */}
+        <div className="flex justify-end mb-1">
+          <span className={`text-xs px-2 py-0.5 rounded font-mono ${chainMode === 'advanced' ? 'bg-amber-900/60 text-amber-300' : 'bg-slate-800 text-slate-500'}`}>
+            {chainMode === 'advanced' ? '⚡ Advanced' : '🎓 Learner'}
+          </span>
+        </div>
 
         {/* Turn + multiplier */}
         <div className="flex items-center justify-between mb-2">

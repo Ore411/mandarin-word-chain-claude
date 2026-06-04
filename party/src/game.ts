@@ -31,6 +31,7 @@ interface ChainEntry {
 }
 
 type RoomStatus = 'waiting' | 'playing' | 'game-over';
+type ChainMode = 'learner' | 'advanced';
 
 export interface PlayerInfo {
   id: string;       // current connection id (changes on reconnect)
@@ -54,6 +55,7 @@ export interface RoomState {
   timeRemaining: number;
   targetScore: number | null;  // First-to-X mode
   livesMode: number | null;    // Lives mode: starting lives per player (1/2/3)
+  chainMode: ChainMode;        // 'learner' | 'advanced'
   gameOverReason: string | null;
   lastMoveError: string | null;
 }
@@ -66,7 +68,7 @@ type ServerMsg =
 
 type ClientMsg =
   | { type: 'join'; name: string; clientId: string }
-  | { type: 'start'; turnSeconds: number; targetScore: number | null; livesMode: number | null }
+  | { type: 'start'; turnSeconds: number; targetScore: number | null; livesMode: number | null; chainMode: ChainMode }
   | { type: 'rematch' }
   | { type: 'play'; word: string };
 
@@ -212,6 +214,7 @@ export default class GameRoom implements Party.Server {
     timeRemaining: TURN_SECONDS,
     targetScore: null,
     livesMode: null,
+    chainMode: 'learner',
     gameOverReason: null,
     lastMoveError: null,
   };
@@ -242,7 +245,7 @@ export default class GameRoom implements Party.Server {
     try { msg = JSON.parse(raw) as ClientMsg; } catch { return; }
 
     if (msg.type === 'join') await this.handleJoin(sender, msg.name, msg.clientId);
-    else if (msg.type === 'start') await this.handleStart(sender, msg.turnSeconds, msg.targetScore, msg.livesMode);
+    else if (msg.type === 'start') await this.handleStart(sender, msg.turnSeconds, msg.targetScore, msg.livesMode, msg.chainMode);
     else if (msg.type === 'rematch') await this.handleRematch(sender);
     else if (msg.type === 'play') await this.handlePlay(sender, msg.word);
   }
@@ -304,7 +307,7 @@ export default class GameRoom implements Party.Server {
     await this.saveState();
   }
 
-  private async handleStart(conn: Party.Connection, turnSeconds: number, targetScore: number | null, livesMode: number | null) {
+  private async handleStart(conn: Party.Connection, turnSeconds: number, targetScore: number | null, livesMode: number | null, chainMode: ChainMode = 'learner') {
     if (this.state.status !== 'waiting') return;
     if (this.state.hostId !== conn.id) {
       conn.send(JSON.stringify({ type: 'error', message: 'Only the host can start the game' } satisfies ServerMsg));
@@ -317,8 +320,9 @@ export default class GameRoom implements Party.Server {
     const validSeconds = [15, 30, 60].includes(turnSeconds) ? turnSeconds : TURN_SECONDS;
     const validTarget = targetScore && [100, 200, 500].includes(targetScore) ? targetScore : null;
     const validLives = livesMode && [1, 2, 3].includes(livesMode) ? livesMode : null;
+    const validChainMode: ChainMode = chainMode === 'advanced' ? 'advanced' : 'learner';
     // Only one mode at a time — lives takes priority if both sent
-    await this.startGame(validSeconds, validLives ? null : validTarget, validLives);
+    await this.startGame(validSeconds, validLives ? null : validTarget, validLives, validChainMode);
   }
 
   private async handleRematch(conn: Party.Connection) {
@@ -333,6 +337,7 @@ export default class GameRoom implements Party.Server {
     this.state.chain = [];
     this.state.targetScore = null;
     this.state.livesMode = null;
+    this.state.chainMode = 'learner';
     this.state.gameOverReason = null;
     this.state.lastMoveError = null;
     this.state.currentPlayerIndex = 0;
@@ -372,6 +377,11 @@ export default class GameRoom implements Party.Server {
     const connType = classifyConnection(prevWord, entry);
     if (connType === 'invalid') {
       this.state.lastMoveError = 'Invalid connection';
+      this.broadcast();
+      return;
+    }
+    if (this.state.chainMode === 'advanced' && connType !== 'exactChar') {
+      this.state.lastMoveError = 'Advanced Mode only accepts exact character matches';
       this.broadcast();
       return;
     }
@@ -419,7 +429,7 @@ export default class GameRoom implements Party.Server {
 
   // ── Game flow ──────────────────────────────────────────────────────────────
 
-  private async startGame(turnSeconds: number = TURN_SECONDS, targetScore: number | null = null, livesMode: number | null = null) {
+  private async startGame(turnSeconds: number = TURN_SECONDS, targetScore: number | null = null, livesMode: number | null = null, chainMode: ChainMode = 'learner') {
     const startWord = pickStartingWord(this.dict);
     this.usedWords = new Set([startWord.simplified]);
 
@@ -428,6 +438,7 @@ export default class GameRoom implements Party.Server {
     this.state.turnSeconds = turnSeconds;
     this.state.targetScore = targetScore;
     this.state.livesMode = livesMode;
+    this.state.chainMode = chainMode;
     this.state.chain = [{
       word: startWord, playedBy: 'start', playerIndex: firstPlayer,
       score: 0, connectionType: '', speedMultiplier: 1,

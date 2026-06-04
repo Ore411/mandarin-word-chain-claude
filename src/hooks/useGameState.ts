@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { loadDictionary, lookupWord } from '@/lib/dictionary';
-import type { WordEntry, MoveResult, ConnectionType } from '@/lib/gameRules';
+import type { WordEntry, MoveResult, ConnectionType, ChainMode } from '@/lib/gameRules';
 import { evaluateMove } from '@/lib/gameRules';
+export type { ChainMode };
 import { pickComputerMove } from '@/lib/computerPlayer';
 
 export type GameMode = 'vs-computer' | 'solo' | 'pass-and-play';
@@ -46,6 +47,7 @@ export function useGameState() {
   const [scores, setScores] = useState<[number, number]>([0, 0]);
   const [currentPlayer, setCurrentPlayer] = useState<0 | 1>(0);
   const [timeRemaining, setTimeRemaining] = useState(TURN_SECONDS);
+  const [chainMode, setChainMode] = useState<ChainMode>('learner');
   const [isComputerThinking, setIsComputerThinking] = useState(false);
   const [gameOverReason, setGameOverReason] = useState<GameOverReason | null>(null);
   const [lastMoveResult, setLastMoveResult] = useState<MoveResult | null>(null);
@@ -58,6 +60,7 @@ export function useGameState() {
   const dictionaryRef = useRef<WordEntry[]>([]);
   const chainRef = useRef<ChainEntry[]>([]);
   const scoresRef = useRef<[number, number]>([0, 0]);
+  const chainModeRef = useRef<ChainMode>('learner');
   const modeRef = useRef<GameMode>('vs-computer');
   const vsModeRef = useRef<VsSubmode | null>(null);
   const computerLevelRef = useRef<ComputerLevel>(null);
@@ -69,6 +72,7 @@ export function useGameState() {
 
   useEffect(() => { chainRef.current = chain; }, [chain]);
   useEffect(() => { scoresRef.current = scores; }, [scores]);
+  useEffect(() => { chainModeRef.current = chainMode; }, [chainMode]);
   useEffect(() => { modeRef.current = mode; }, [mode]);
   useEffect(() => { vsModeRef.current = vsSubmode; }, [vsSubmode]);
   useEffect(() => { computerLevelRef.current = computerLevel; }, [computerLevel]);
@@ -155,8 +159,11 @@ export function useGameState() {
     };
   }, [newChainSegment]);
 
-  const startGame = useCallback((selectedMode: GameMode, selectedVsSubmode?: VsSubmode, selectedComputerLevel?: ComputerLevel, selectedTurnSeconds?: number) => {
+  const startGame = useCallback((selectedMode: GameMode, selectedVsSubmode?: VsSubmode, selectedComputerLevel?: ComputerLevel, selectedTurnSeconds?: number, selectedChainMode?: ChainMode) => {
     turnSecondsRef.current = selectedTurnSeconds ?? TURN_SECONDS;
+    const cm = selectedChainMode ?? 'learner';
+    setChainMode(cm);
+    chainModeRef.current = cm;
     const dict = dictionaryRef.current;
     const startWord = pickStartingWord(dict);
     const initialChain: ChainEntry[] = [{ word: startWord, playedBy: 'start', score: 0, connectionType: '', speedMultiplier: 1 }];
@@ -235,7 +242,7 @@ export function useGameState() {
     // Computer always "answers" within the grace period — give it a mid-range time
     const ts = turnSecondsRef.current;
     const computerTimeRemaining = ts - 2;
-    const result = evaluateMove(afterWord, move, afterUsed, computerTimeRemaining, ts);
+    const result = evaluateMove(afterWord, move, afterUsed, computerTimeRemaining, ts, chainModeRef.current);
     const entry: ChainEntry = {
       word: move, playedBy: 1,
       score: result.totalScore, connectionType: result.connectionType, speedMultiplier: result.speedMultiplier,
@@ -271,7 +278,7 @@ export function useGameState() {
     const prevChain = chainRef.current;
     const prevWord = prevChain[prevChain.length - 1].word;
     const used = usedSet(prevChain);
-    const result = evaluateMove(prevWord, entry, used, timeRemaining, turnSecondsRef.current);
+    const result = evaluateMove(prevWord, entry, used, timeRemaining, turnSecondsRef.current, chainModeRef.current);
 
     setLastMoveResult(result);
     if (!result.valid) {
@@ -359,7 +366,7 @@ export function useGameState() {
   }, [stopTimer]);
 
   return {
-    dictionaryLoading, status, mode, vsSubmode, computerLevel, chain, scores, currentPlayer,
+    dictionaryLoading, status, mode, vsSubmode, computerLevel, chainMode, chain, scores, currentPlayer,
     timeRemaining, isComputerThinking, gameOverReason, lastMoveResult,
     lives, playerTurnsLeft,
     firstToXTarget: FIRST_TO_X_TARGET,

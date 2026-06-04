@@ -3,7 +3,7 @@
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense, useEffect } from 'react';
 import { useGameState } from '@/hooks/useGameState';
-import type { GameMode, VsSubmode, ComputerLevel } from '@/hooks/useGameState';
+import type { GameMode, VsSubmode, ComputerLevel, ChainMode } from '@/hooks/useGameState';
 import GameBoard from '@/components/GameBoard';
 
 function GameContent() {
@@ -15,9 +15,12 @@ function GameContent() {
   const computerLevel = (levelParam ? parseInt(levelParam) : null) as ComputerLevel;
   const timeParam = searchParams.get('time');
   const turnSeconds = timeParam && [15, 30, 60].includes(parseInt(timeParam)) ? parseInt(timeParam) : undefined;
+  const chainModeParam = searchParams.get('chainMode');
+  const chainMode: ChainMode = chainModeParam === 'advanced' ? 'advanced' : 'learner';
 
   const {
     dictionaryLoading, status, mode: activeMode, vsSubmode, computerLevel: activeComputerLevel,
+    chainMode: activeChainMode,
     chain, scores, currentPlayer, timeRemaining, isComputerThinking, gameOverReason,
     lastMoveResult, lives, playerTurnsLeft, firstToXTarget, roundsTotal,
     submitWord, startGame, resetGame,
@@ -25,9 +28,9 @@ function GameContent() {
 
   useEffect(() => {
     if (status === 'ready') {
-      startGame(mode, submode, computerLevel, turnSeconds);
+      startGame(mode, submode, computerLevel, turnSeconds, chainMode);
     }
-  }, [status, mode, submode, computerLevel, turnSeconds, startGame]);
+  }, [status, mode, submode, computerLevel, turnSeconds, chainMode, startGame]);
 
   if (dictionaryLoading || status === 'loading' || status === 'ready') {
     return (
@@ -66,6 +69,7 @@ function GameContent() {
           mode={activeMode}
           vsSubmode={vsSubmode}
           computerLevel={activeComputerLevel}
+          chainMode={activeChainMode}
           status={status}
           lives={lives}
           playerTurnsLeft={playerTurnsLeft}
