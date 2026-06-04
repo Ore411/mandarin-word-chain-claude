@@ -233,7 +233,8 @@ export default function GameBoard({
     };
 
     return (
-      <div className="flex flex-col items-center gap-6 text-center px-4 py-8 overflow-y-auto">
+      <div className="h-full overflow-y-auto">
+      <div className="flex flex-col items-center gap-6 text-center px-4 py-8">
         <h2 className="text-4xl font-bold text-white">Game Over</h2>
         <div className="flex items-center gap-3">
           {vsSubmode && (
@@ -279,6 +280,7 @@ export default function GameBoard({
         </button>
 
         <VocabReview chain={chain} />
+      </div>
       </div>
     );
   }

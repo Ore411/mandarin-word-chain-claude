@@ -300,7 +300,8 @@ export default function MultiplayerBoard({
     const winner = sorted[0]?.score > (sorted[1]?.score ?? 0) ? sorted[0] : null;
 
     return (
-      <div className="flex flex-col items-center gap-6 text-center px-4 py-8 overflow-y-auto">
+      <div className="h-full overflow-y-auto">
+      <div className="flex flex-col items-center gap-6 text-center px-4 py-8">
         <h2 className="text-4xl font-bold text-white">Game Over</h2>
         <p className="text-slate-400">
           {gameOverReason === 'timeout' ? 'Time ran out!' : gameOverReason ?? 'Game ended'}
@@ -363,6 +364,7 @@ export default function MultiplayerBoard({
         </div>
 
         <VocabReview chain={chain} />
+      </div>
       </div>
     );
   }
