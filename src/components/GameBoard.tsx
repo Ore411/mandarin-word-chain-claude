@@ -80,9 +80,12 @@ function ChainEntryRow({ entry, mode, isLast }: { entry: ChainEntry; mode: GameM
         <div className="flex items-baseline gap-2">
           <span className="text-2xl font-bold text-white tracking-wider">{entry.word.simplified}</span>
           <HskBadge level={entry.word.hskLevel} />
-          {lb > 0 && (
+          {lb > 0 && entry.speedMultiplier !== undefined && (
             <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-violet-900/70 text-violet-300">
-              {entry.word.wordLength}字 +{lb}
+              {entry.word.wordLength}字 +{Math.round(lb * entry.speedMultiplier)}
+              {entry.speedMultiplier !== 1 && (
+                <span className="opacity-60 font-normal"> (+{lb}×{entry.speedMultiplier.toFixed(1)})</span>
+              )}
             </span>
           )}
         </div>
@@ -484,7 +487,7 @@ export default function GameBoard({
                           : 'bg-slate-700 text-slate-400'
                       }`}
                     >
-                      {label} <span className={isActive ? 'text-violet-200' : 'text-slate-500'}>+{bonus}</span>
+                      {label} <span className={isActive ? 'text-violet-200' : 'text-slate-500'}>+{bonus}×</span>
                     </span>
                   );
                 })}

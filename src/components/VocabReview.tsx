@@ -127,7 +127,19 @@ export default function VocabReview({ chain }: Props) {
                   </span>
                   {wordLengthBonus(entry.word.wordLength) > 0 && (
                     <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-violet-900/70 text-violet-300 leading-none">
-                      {entry.word.wordLength}字 +{wordLengthBonus(entry.word.wordLength)}
+                      {(() => {
+                        const lb = wordLengthBonus(entry.word.wordLength);
+                        const mult = entry.speedMultiplier ?? 1;
+                        const actual = Math.round(lb * mult);
+                        return (
+                          <>
+                            {entry.word.wordLength}字 +{actual}
+                            {mult !== 1 && (
+                              <span className="opacity-60 font-normal"> (+{lb}×{mult.toFixed(1)})</span>
+                            )}
+                          </>
+                        );
+                      })()}
                     </span>
                   )}
                 </div>
