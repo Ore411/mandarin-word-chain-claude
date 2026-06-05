@@ -85,8 +85,11 @@ function ChainEntryRow({ entry, mode, isLast }: { entry: ChainEntry; mode: GameM
         {entry.connectionType && (
           <span className={`text-xs mt-0.5 ${CONNECTION_COLORS[entry.connectionType as ConnectionType]}`}>
             {CONNECTION_LABELS[entry.connectionType as ConnectionType]}
-            {lb > 0 && ` · ${charCount}字 +${lb}`}
-            {entry.word.isChengyu && ' · Chengyu +5'}
+            {entry.word.isChengyu
+              ? ' · Chengyu +5'
+              : lb > 0
+                ? ` · ${charCount}字 +${lb}`
+                : null}
           </span>
         )}
       </div>
