@@ -46,6 +46,13 @@ const HSK_COLORS: Record<number, string> = {
   6: 'bg-red-900 text-red-200',
 };
 
+function wordLengthBonus(n: number): number {
+  if (n === 3) return 2;
+  if (n === 4) return 4;
+  if (n >= 5) return 6;
+  return 0;
+}
+
 function shortMeaning(english: string, n = 2) {
   return english.split(';').slice(0, n).join(';').trim();
 }
@@ -114,9 +121,16 @@ export default function VocabReview({ chain }: Props) {
 
               {/* Chinese + pinyin */}
               <div className="flex flex-col items-start shrink-0 min-w-[5rem]">
-                <span className="text-white text-2xl font-bold leading-tight tracking-wide">
-                  {entry.word.simplified}
-                </span>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-white text-2xl font-bold leading-tight tracking-wide">
+                    {entry.word.simplified}
+                  </span>
+                  {wordLengthBonus(entry.word.wordLength) > 0 && (
+                    <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-violet-900/70 text-violet-300 leading-none">
+                      {entry.word.wordLength}字 +{wordLengthBonus(entry.word.wordLength)}
+                    </span>
+                  )}
+                </div>
                 <span className="text-slate-400 text-xs font-mono mt-0.5">
                   {toToneMarks(entry.word.pinyin)}
                 </span>

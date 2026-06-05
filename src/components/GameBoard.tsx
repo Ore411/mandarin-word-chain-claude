@@ -52,7 +52,15 @@ function PlayerLabel({ playedBy, mode }: { playedBy: ChainEntry['playedBy']; mod
   return <span className="text-emerald-400 text-xs">You</span>;
 }
 
+function wordLengthBonus(n: number): number {
+  if (n === 3) return 2;
+  if (n === 4) return 4;
+  if (n >= 5) return 6;
+  return 0;
+}
+
 function ChainEntryRow({ entry, mode, isLast }: { entry: ChainEntry; mode: GameMode; isLast: boolean }) {
+  const lb = wordLengthBonus(entry.word.wordLength);
   return (
     <div className={`flex items-start gap-3 py-3 ${isLast ? 'opacity-100' : 'opacity-60'}`}>
       <div className="flex flex-col items-end min-w-[2.5rem]">
@@ -72,6 +80,11 @@ function ChainEntryRow({ entry, mode, isLast }: { entry: ChainEntry; mode: GameM
         <div className="flex items-baseline gap-2">
           <span className="text-2xl font-bold text-white tracking-wider">{entry.word.simplified}</span>
           <HskBadge level={entry.word.hskLevel} />
+          {lb > 0 && (
+            <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-violet-900/70 text-violet-300">
+              {entry.word.wordLength}字 +{lb}
+            </span>
+          )}
         </div>
         <span className="text-slate-400 text-xs">{entry.word.pinyin}</span>
         <span className="text-slate-500 text-xs truncate max-w-xs">{shortMeaning(entry.word.english)}</span>
