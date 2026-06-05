@@ -474,7 +474,7 @@ export default function GameBoard({
                     key={chars}
                     className="px-2 py-0.5 rounded text-xs font-mono font-semibold bg-slate-700 text-slate-400"
                   >
-                    {label} <span className="text-slate-500">+{bonus}×</span>
+                    {label} <span className="text-slate-500">+{bonus}</span>
                   </span>
                 ))}
               </div>
