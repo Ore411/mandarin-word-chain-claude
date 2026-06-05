@@ -102,7 +102,8 @@ function wordLengthBonus(n: number): number {
 
 function ChainRow({ entry, players, isLast }: { entry: ChainEntry; players: PlayerInfo[]; isLast: boolean }) {
   const player = players.find(p => p.index === entry.playerIndex);
-  const lb = entry.word.isChengyu ? 0 : wordLengthBonus(entry.word.wordLength);
+  const charCount = [...entry.word.simplified].length;
+  const lb = entry.word.isChengyu ? 0 : wordLengthBonus(charCount);
   const mult = entry.speedMultiplier ?? 1;
   const multColor = mult >= 1.8 ? 'text-emerald-400' : mult >= 1.0 ? 'text-amber-400' : 'text-red-400';
   return (
@@ -128,7 +129,7 @@ function ChainRow({ entry, players, isLast }: { entry: ChainEntry; players: Play
         {entry.connectionType && CONNECTION_LABELS[entry.connectionType] && (
           <span className={`text-xs mt-0.5 ${CONNECTION_COLORS[entry.connectionType] ?? ''}`}>
             {CONNECTION_LABELS[entry.connectionType]}
-            {lb > 0 && ` · ${entry.word.wordLength}字 +${lb}`}
+            {lb > 0 && ` · ${charCount}字 +${lb}`}
             {entry.word.isChengyu && ' · Chengyu +5'}
           </span>
         )}

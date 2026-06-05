@@ -60,7 +60,8 @@ function wordLengthBonus(n: number): number {
 }
 
 function ChainEntryRow({ entry, mode, isLast }: { entry: ChainEntry; mode: GameMode; isLast: boolean }) {
-  const lb = entry.word.isChengyu ? 0 : wordLengthBonus(entry.word.wordLength);
+  const charCount = [...entry.word.simplified].length;
+  const lb = entry.word.isChengyu ? 0 : wordLengthBonus(charCount);
   const mult = entry.speedMultiplier ?? 1;
   const multColor = mult >= 1.8 ? 'text-emerald-400' : mult >= 1.0 ? 'text-amber-400' : 'text-red-400';
   return (
@@ -84,7 +85,7 @@ function ChainEntryRow({ entry, mode, isLast }: { entry: ChainEntry; mode: GameM
         {entry.connectionType && (
           <span className={`text-xs mt-0.5 ${CONNECTION_COLORS[entry.connectionType as ConnectionType]}`}>
             {CONNECTION_LABELS[entry.connectionType as ConnectionType]}
-            {lb > 0 && ` · ${entry.word.wordLength}字 +${lb}`}
+            {lb > 0 && ` · ${charCount}字 +${lb}`}
             {entry.word.isChengyu && ' · Chengyu +5'}
           </span>
         )}
