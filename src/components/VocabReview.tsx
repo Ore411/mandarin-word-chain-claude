@@ -142,7 +142,7 @@ export default function VocabReview({ chain }: Props) {
                 {entry.connectionType && CONNECTION_LABELS[entry.connectionType] && (
                   <span className={`text-xs mt-1 ${CONNECTION_COLORS[entry.connectionType]}`}>
                     {CONNECTION_LABELS[entry.connectionType]}
-                    {wordLengthBonus(entry.word.wordLength) > 0 && ` · ${entry.word.wordLength}字 +${wordLengthBonus(entry.word.wordLength)}`}
+                    {!entry.word.isChengyu && wordLengthBonus(entry.word.wordLength) > 0 && ` · ${entry.word.wordLength}字 +${wordLengthBonus(entry.word.wordLength)}`}
                     {entry.word.isChengyu && ' · 成语 +5'}
                   </span>
                 )}

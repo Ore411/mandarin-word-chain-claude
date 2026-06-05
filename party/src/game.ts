@@ -391,8 +391,8 @@ export default class GameRoom implements Party.Server {
     player.connected = true;
 
     const base = BASE_SCORES[connType];
-    const lb = lengthBonus(entry.wordLength);
     const cb = entry.isChengyu ? 5 : 0;
+    const lb = cb > 0 ? 0 : lengthBonus(entry.wordLength); // chengyu bonus replaces length bonus
     const mult = speedMultiplier(this.state.timeRemaining, this.state.turnSeconds);
     const score = Math.round((base + lb + cb) * mult);
 

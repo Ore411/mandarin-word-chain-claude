@@ -104,8 +104,8 @@ export function evaluateMove(
   if (chainMode === 'advanced' && connectionType !== 'exactChar') return invalid('exactChar');
 
   const base = BASE_SCORES[connectionType];
-  const lb = lengthBonus(next.wordLength);
   const cb = next.isChengyu ? 5 : 0;
+  const lb = cb > 0 ? 0 : lengthBonus(next.wordLength); // chengyu bonus replaces length bonus
   const mult = calcSpeedMultiplier(timeRemaining, turnSeconds);
 
   return {

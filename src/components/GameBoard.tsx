@@ -60,7 +60,7 @@ function wordLengthBonus(n: number): number {
 }
 
 function ChainEntryRow({ entry, mode, isLast }: { entry: ChainEntry; mode: GameMode; isLast: boolean }) {
-  const lb = wordLengthBonus(entry.word.wordLength);
+  const lb = entry.word.isChengyu ? 0 : wordLengthBonus(entry.word.wordLength);
   const mult = entry.speedMultiplier ?? 1;
   const multColor = mult >= 1.8 ? 'text-emerald-400' : mult >= 1.0 ? 'text-amber-400' : 'text-red-400';
   return (
