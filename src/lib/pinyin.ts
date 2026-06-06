@@ -60,6 +60,7 @@ export type FinalRelation = 'exact' | 'strongSimilar' | 'weakMusical' | 'invalid
 
 const STRONG_SIMILAR_FINALS: [string, string][] = [
   ['an', 'ang'], ['en', 'eng'], ['in', 'ing'], ['ian', 'iang'], ['uan', 'uang'],
+  ['e', 'ei'],
 ];
 
 const STRONG_SIMILAR_SET = new Set<string>(
