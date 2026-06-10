@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getSavedWords, deleteWord, type SavedWord } from '@/lib/vocabulary';
+import { getSavedWords, deleteWord, getDueWords, type SavedWord } from '@/lib/vocabulary';
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -12,10 +12,12 @@ function formatDate(iso: string): string {
 
 export default function VocabularyPage() {
   const [words, setWords] = useState<SavedWord[]>([]);
+  const [dueCount, setDueCount] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     setWords(getSavedWords());
+    setDueCount(getDueWords().length);
     setLoaded(true);
   }, []);
 
@@ -40,6 +42,20 @@ export default function VocabularyPage() {
 
       <main className="flex-1 overflow-y-auto px-4 py-6">
         <div className="max-w-lg mx-auto flex flex-col gap-3">
+          {loaded && words.length > 0 && (
+            <Link
+              href="/vocabulary/study"
+              className="flex items-center justify-center gap-2 py-3 mb-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-colors"
+            >
+              <span>📚 Study Flashcards</span>
+              {dueCount > 0 && (
+                <span className="bg-emerald-800 text-emerald-100 text-xs font-mono px-2 py-0.5 rounded-full">
+                  {dueCount} due
+                </span>
+              )}
+            </Link>
+          )}
+
           {loaded && words.length === 0 && (
             <div className="text-center text-slate-500 mt-16 flex flex-col gap-3">
               <p className="text-lg">No saved words yet.</p>
